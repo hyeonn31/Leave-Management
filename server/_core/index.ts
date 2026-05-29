@@ -5,7 +5,8 @@ import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
-import { appRouter } from "../routers";
+import { appRouter, handleLeaveRenewal } from "../routers";
+import { sdk } from "./sdk";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 
@@ -44,6 +45,24 @@ async function startServer() {
       createContext,
     })
   );
+  // Scheduled: leave renewal (heartbeat cron)
+  app.post("/api/scheduled/leave-renewal", async (req, res) => {
+    try {
+      const user = await sdk.authenticateRequest(req);
+      if (!user.isCron || !user.taskUid) {
+        return res.status(403).json({ error: "cron-only" });
+      }
+      const result = await handleLeaveRenewal();
+      return res.json({ ok: true, ...result });
+    } catch (err: any) {
+      console.error("[leave-renewal] error", err);
+      return res.status(500).json({
+        error: err?.message ?? "unknown",
+        timestamp: new Date().toISOString(),
+      });
+    }
+  });
+
   // development mode uses Vite, production mode uses static files
   if (process.env.NODE_ENV === "development") {
     await setupVite(app, server);
