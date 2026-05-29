@@ -37,7 +37,7 @@ import {
   getAllLeaveBalancesForYear as getAllBalances,
   getAllActiveUsersWithEmployees,
 } from "./db";
-import { calculateLeaveEntitlement, calculateDaysForLeaveType } from "./leaveCalc";
+import { calculateLeaveEntitlement, calculateDaysForLeaveType, calculateGrantedDaysForYear } from "./leaveCalc";
 import { notifyOwner } from "./_core/notification";
 
 // ─── Admin guard ───────────────────────────────────────────────────────────────
@@ -101,6 +101,47 @@ const employeeRouter = router({
       return { success: true };
     }),
 
+  // Admin: recalculate leave balance for a specific user and fiscal year
+  recalcLeave: adminProcedure
+    .input(
+      z.object({
+        userId: z.number(),
+        fiscalYear: z.number(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const employee = await getEmployeeByUserId(input.userId);
+      if (!employee?.entryDate) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "입사일이 등록되지 않아 연차를 계산할 수 없습니다.",
+        });
+      }
+
+      const entryDate = new Date(employee.entryDate);
+      const fiscalYear = input.fiscalYear;
+
+      // 1) 해당 연도에 승인된 연차 신청의 실제 사용 일수를 집계
+      const requests = await getLeaveRequestsByUser(input.userId, fiscalYear);
+      const usedDays = requests
+        .filter((r) => r.status === "approved")
+        .reduce((sum, r) => sum + Number(r.totalDays), 0);
+
+      // 2) 입사일 기준으로 해당 연도의 법정 부여 일수 재계산
+      const totalGranted = calculateGrantedDaysForYear(entryDate, fiscalYear, "entry_date");
+      const remaining = Math.max(0, totalGranted - usedDays);
+
+      // 3) leave_balances upsert (totalGranted + used 재설정, remaining 재계산)
+      await upsertLeaveBalance({
+        userId: input.userId,
+        fiscalYear,
+        totalGranted: String(totalGranted),
+        used: String(usedDays),
+        remaining: String(remaining),
+      });
+
+      return { totalGranted, usedDays, remaining };
+    }),
   // Admin: create employee profile for existing user
   adminCreate: adminProcedure
     .input(

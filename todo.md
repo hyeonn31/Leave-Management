@@ -41,3 +41,6 @@
 - [x] auth.logout 기존 테스트 통과
 - [x] TypeScript 오류 0개 확인
 - [x] 체크포인트 저장
+
+## 추가 기능 요청
+- [x] 관리자 직원 관리 화면에 입사일 변경 후 연차 잔여일수 즉시 재계산 버튼 추가 (백엔드 recalcLeave 프로시저 + AdminEmployees.tsx UI)
