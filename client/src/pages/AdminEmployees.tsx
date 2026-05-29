@@ -217,7 +217,7 @@ export default function AdminEmployees() {
                     <td className="px-4 py-3 text-muted-foreground">{row.employee?.department ?? "-"}</td>
                     <td className="px-4 py-3 text-muted-foreground">{row.employee?.position ?? "-"}</td>
                     <td className="px-4 py-3 text-muted-foreground font-mono text-xs">
-                      {toDateInputValue(row.employee?.entryDate) || "-"}
+                      {row.user.role === "admin" ? <span className="text-muted-foreground/30">-</span> : (toDateInputValue(row.employee?.entryDate) || "-")}
                     </td>
                     <td className="px-4 py-3">
                       {row.employee ? (
@@ -284,6 +284,7 @@ export default function AdminEmployees() {
               </div>
             ))}
 
+            {form.role !== "admin" && (
             <div>
               <label className="block text-xs font-medium text-muted-foreground mb-1.5">입사일</label>
               <input
@@ -296,6 +297,7 @@ export default function AdminEmployees() {
                 <p className="mt-1.5 text-xs text-amber-600">※ 입사일이 변경되었습니다. 먼저 저장 후 재계산하세요.</p>
               )}
             </div>
+            )}
 
             <div className="grid grid-cols-2 gap-3">
               <div>
