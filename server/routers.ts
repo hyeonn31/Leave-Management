@@ -795,7 +795,7 @@ export async function handleLeaveRenewal() {
 const teamRouter = router({
   listAll: adminProcedure.query(async () => getAllTeams()),
   create: adminProcedure
-    .input(z.object({ name: z.string().min(1), description: z.string().optional(), approverId: z.number().optional() }))
+    .input(z.object({ name: z.string().min(1), description: z.string().optional(), approverId: z.number().nullable().optional() }))
     .mutation(async ({ input }) => {
       const id = await createTeam({ name: input.name, description: input.description ?? null, approverId: input.approverId ?? null });
       return { id };

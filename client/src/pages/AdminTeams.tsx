@@ -83,17 +83,21 @@ export default function AdminTeams() {
     setForm({
       name: t.team.name,
       description: t.team.description ?? "",
-      approverId: t.team.approverId ? String(t.team.approverId) : "",
+      approverId: t.team.approverId ? String(t.team.approverId) : "none",
     });
     setShowDialog(true);
   };
 
   const handleSave = () => {
     if (!form.name.trim()) return toast.error("팀 이름을 입력하세요.");
+    const approverIdVal =
+      form.approverId && form.approverId !== "none"
+        ? Number(form.approverId)
+        : null;
     const payload = {
       name: form.name.trim(),
       description: form.description.trim() || undefined,
-      approverId: form.approverId ? Number(form.approverId) : undefined,
+      approverId: approverIdVal as number | null | undefined,
     };
     if (editTarget) {
       updateTeam.mutate({ teamId: editTarget, ...payload });
