@@ -126,11 +126,9 @@ const employeeRouter = router({
         .filter((r) => r.status === "approved")
         .reduce((sum, r) => sum + Number(r.totalDays), 0);
       // 2) 입사일 기준으로 해당 연도의 법정 부여 일수 재계산
-      // 기준일: 해당 연도 마지막 날(12/31) 또는 오늘 중 더 이른 날 사용
-      // → 입사 당해연도라도 실제 근속 개월 수를 정확히 반영
-      const fiscalYearEnd = new Date(fiscalYear, 11, 31);
-      const today = new Date();
-      const referenceDate = fiscalYearEnd < today ? fiscalYearEnd : today;
+      // 기준일: 해당 연도 12월 31일로 고정 (연도 내 최대 부여 가능 일수 기준)
+      // → 입사 당해연도 포함, 연도 말 기준 근속 개월 수를 반영
+      const referenceDate = new Date(fiscalYear, 11, 31);
       const totalGranted = calculateLeaveEntitlement(entryDate, referenceDate).totalDays;
       const remaining = Math.max(0, totalGranted - usedDays);
 
@@ -539,12 +537,20 @@ const adminRouter = router({
               remaining: String(newRemaining),
             });
           } else {
+            // 기존 연차 쟑여일수가 없으면 입사일 기준 법정 연차를 계산하여 초기화
+            const emp = await getEmployeeByUserId(userId);
+            let baseLegal = 0;
+            if (emp?.entryDate) {
+              const refDate = new Date(input.fiscalYear, 11, 31);
+              baseLegal = calculateLeaveEntitlement(new Date(emp.entryDate), refDate).totalDays;
+            }
+            const newTotal = baseLegal + input.days;
             await upsertLeaveBalance({
               userId,
               fiscalYear: input.fiscalYear,
-              totalGranted: String(input.days),
+              totalGranted: String(newTotal),
               used: '0',
-              remaining: String(input.days),
+              remaining: String(newTotal),
             });
           }
           // 2. Record as leave adjustment for audit trail
