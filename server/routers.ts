@@ -64,7 +64,7 @@ const employeeRouter = router({
         entryDate: z.string().optional(), // ISO date string
       })
     )
-    .mutation(async ({ ctx, input }) => {
+        .mutation(async ({ ctx, input }) => {
       await upsertEmployee({
         userId: ctx.user.id,
         employeeNumber: input.employeeNumber,
@@ -73,9 +73,23 @@ const employeeRouter = router({
         entryDate: input.entryDate as any,
         status: "active",
       });
+      // Auto-recalculate leave balance when entryDate is provided
+      if (input.entryDate) {
+        const currentYear = new Date().getFullYear();
+        const referenceDate = new Date(currentYear, 11, 31);
+        const entitlement = calculateLeaveEntitlement(new Date(input.entryDate), referenceDate);
+        const existingBalance = await getLeaveBalance(ctx.user.id, currentYear);
+        const existingUsed = existingBalance ? existingBalance.used : "0";
+        await upsertLeaveBalance({
+          userId: ctx.user.id,
+          fiscalYear: currentYear,
+          totalGranted: String(entitlement.totalDays),
+          used: existingUsed,
+          remaining: String(Math.max(0, entitlement.totalDays - Number(existingUsed))),
+        });
+      }
       return { success: true };
     }),
-
   // Admin: list all employees
   listAll: adminProcedure.query(async () => {
     return getAllEmployeesWithUsers();
@@ -98,13 +112,27 @@ const employeeRouter = router({
         role: z.enum(["user", "admin"]).optional(),
       })
     )
-    .mutation(async ({ input }) => {
+        .mutation(async ({ input }) => {
       const { userId, role, ...empData } = input;
       await updateEmployee(userId, empData as any);
       if (role) await updateUserRole(userId, role);
+      // Auto-recalculate leave balance when entryDate is updated
+      if (input.entryDate) {
+        const currentYear = new Date().getFullYear();
+        const referenceDate = new Date(currentYear, 11, 31);
+        const entitlement = calculateLeaveEntitlement(new Date(input.entryDate), referenceDate);
+        const existingBalance = await getLeaveBalance(userId, currentYear);
+        const existingUsed = existingBalance ? existingBalance.used : "0";
+        await upsertLeaveBalance({
+          userId,
+          fiscalYear: currentYear,
+          totalGranted: String(entitlement.totalDays),
+          used: existingUsed,
+          remaining: String(Math.max(0, entitlement.totalDays - Number(existingUsed))),
+        });
+      }
       return { success: true };
     }),
-
   // Admin: recalculate leave balance for a specific user and fiscal year
   recalcLeave: adminProcedure
     .input(
@@ -158,7 +186,7 @@ const employeeRouter = router({
         entryDate: z.string().optional(),
       })
     )
-    .mutation(async ({ input }) => {
+        .mutation(async ({ input }) => {
       await upsertEmployee({
         userId: input.userId,
         employeeNumber: input.employeeNumber,
@@ -167,33 +195,53 @@ const employeeRouter = router({
         entryDate: input.entryDate as any,
         status: "active",
       });
+      // Auto-calculate leave balance when entryDate is provided
+      if (input.entryDate) {
+        const currentYear = new Date().getFullYear();
+        const referenceDate = new Date(currentYear, 11, 31);
+        const entitlement = calculateLeaveEntitlement(new Date(input.entryDate), referenceDate);
+        const existingBalance = await getLeaveBalance(input.userId, currentYear);
+        const existingUsed = existingBalance ? existingBalance.used : "0";
+        await upsertLeaveBalance({
+          userId: input.userId,
+          fiscalYear: currentYear,
+          totalGranted: String(entitlement.totalDays),
+          used: existingUsed,
+          remaining: String(Math.max(0, entitlement.totalDays - Number(existingUsed))),
+        });
+      }
       return { success: true };
     }),
 });
-
 // ─── Leave Balance router ──────────────────────────────────────────────────────
 const leaveBalanceRouter = router({
   getMyBalance: protectedProcedure
     .input(z.object({ fiscalYear: z.number().optional() }))
     .query(async ({ ctx, input }) => {
       const year = input.fiscalYear ?? new Date().getFullYear();
-      const balance = await getLeaveBalance(ctx.user.id, year);
+            const balance = await getLeaveBalance(ctx.user.id, year);
       const employee = await getEmployeeByUserId(ctx.user.id);
-
-      // Auto-calculate and create balance if not exists
-      if (!balance && employee?.entryDate) {
-        const entitlement = calculateLeaveEntitlement(new Date(employee.entryDate));
+      // Auto-calculate and create balance if not exists OR if totalGranted is 0 but entryDate exists
+      const needsCalc = employee?.entryDate && (
+        !balance || (Number(balance.totalGranted) === 0 && Number(balance.used) === 0)
+      );
+      if (needsCalc) {
+        const referenceDate = new Date(year, 11, 31);
+        const entryDateVal = employee!.entryDate;
+        const entitlement = calculateLeaveEntitlement(new Date(entryDateVal instanceof Date ? entryDateVal : String(entryDateVal)), referenceDate);
+        const existingUsed = balance ? balance.used : "0";
+        const newTotal = entitlement.totalDays;
+        const newRemaining = Math.max(0, newTotal - Number(existingUsed));
         const newBalance = {
           userId: ctx.user.id,
           fiscalYear: year,
-          totalGranted: String(entitlement.totalDays),
-          used: "0",
-          remaining: String(entitlement.totalDays),
+          totalGranted: String(newTotal),
+          used: existingUsed,
+          remaining: String(newRemaining),
         };
         await upsertLeaveBalance(newBalance);
         return newBalance;
       }
-
       return balance ?? null;
     }),
 
