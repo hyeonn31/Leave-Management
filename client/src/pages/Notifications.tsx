@@ -1,18 +1,52 @@
 import DashboardLayout from "@/components/DashboardLayout";
 import { trpc } from "@/lib/trpc";
-import { Bell, BellOff, CheckCheck, CalendarCheck, CalendarX, Calendar, Gift } from "lucide-react";
+import { useAuth } from "@/_core/hooks/useAuth";
+import { Bell, BellOff, CheckCheck, CalendarCheck, CalendarX, Calendar, Gift, UserPlus, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
+import { useLocation } from "wouter";
 
 const TYPE_CONFIG: Record<string, { label: string; icon: React.ReactNode; color: string; bg: string }> = {
-  leave_request_submitted: { label: "연차 신청",  icon: <Calendar size={14} />,      color: "var(--color-primary)", bg: "oklch(93% 0.06 264)" },
-  leave_approved:          { label: "연차 승인",  icon: <CalendarCheck size={14} />,  color: "oklch(55% 0.18 145)", bg: "oklch(93% 0.06 145)" },
-  leave_rejected:          { label: "연차 반려",  icon: <CalendarX size={14} />,      color: "oklch(55% 0.22 25)",  bg: "oklch(95% 0.04 25)" },
-  leave_renewal:           { label: "연차 갱신",  icon: <Gift size={14} />,           color: "oklch(60% 0.18 85)",  bg: "oklch(95% 0.04 85)" },
+  leave_request_submitted:  { label: "연차 신청",    icon: <Calendar size={14} />,      color: "var(--color-primary)", bg: "oklch(93% 0.06 264)" },
+  leave_approved:           { label: "연차 승인",    icon: <CalendarCheck size={14} />,  color: "oklch(55% 0.18 145)", bg: "oklch(93% 0.06 145)" },
+  leave_rejected:           { label: "연차 반려",    icon: <CalendarX size={14} />,      color: "oklch(55% 0.22 25)",  bg: "oklch(95% 0.04 25)" },
+  leave_renewal:            { label: "연차 갱신",    icon: <Gift size={14} />,           color: "oklch(60% 0.18 85)",  bg: "oklch(95% 0.04 85)" },
+  new_signup:               { label: "신규 가입",    icon: <UserPlus size={14} />,       color: "oklch(55% 0.18 300)", bg: "oklch(93% 0.04 300)" },
+  team_leave_request:       { label: "팀 연차 신청", icon: <Calendar size={14} />,      color: "oklch(55% 0.18 220)", bg: "oklch(93% 0.06 220)" },
+  team_leave_approved:      { label: "팀장 승인",    icon: <CalendarCheck size={14} />,  color: "oklch(55% 0.18 145)", bg: "oklch(93% 0.06 145)" },
+  team_leave_rejected:      { label: "팀장 반려",    icon: <CalendarX size={14} />,      color: "oklch(55% 0.22 25)",  bg: "oklch(95% 0.04 25)" },
 };
 
+function getNavigationPath(type: string, isAdmin: boolean): string | null {
+  switch (type) {
+    case "leave_request_submitted":
+    case "team_leave_request":
+      return isAdmin ? "/admin/requests" : "/leave/history";
+    case "leave_approved":
+    case "leave_rejected":
+    case "team_leave_approved":
+    case "team_leave_rejected":
+      return "/leave/history";
+    case "leave_renewal":
+      return "/";
+    case "new_signup":
+      return "/admin/employees";
+    default:
+      return null;
+  }
+}
+
 export default function Notifications() {
+  const { user } = useAuth();
+  const [, navigate] = useLocation();
+  const isAdmin = user?.role === "admin";
   const { data: notifications, isLoading } = trpc.notification.list.useQuery();
   const utils = trpc.useUtils();
+
+  const handleClick = (n: { id: number; isRead: boolean; type: string }) => {
+    if (!n.isRead) markRead.mutate({ id: n.id });
+    const path = getNavigationPath(n.type, isAdmin);
+    if (path) navigate(path);
+  };
 
   const markRead = trpc.notification.markRead.useMutation({
     onSuccess: () => {
@@ -78,7 +112,7 @@ export default function Notifications() {
               return (
                 <div
                   key={n.id}
-                  onClick={() => { if (!n.isRead) markRead.mutate({ id: n.id }); }}
+                  onClick={() => handleClick(n)}
                   className={`flex items-start gap-4 px-5 py-4 cursor-pointer transition-colors hover:bg-muted/30 ${!n.isRead ? "bg-secondary/40" : ""}`}
                 >
                   <div
@@ -104,9 +138,12 @@ export default function Notifications() {
                     <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{n.message}</p>
                   </div>
 
-                  <p className="text-xs text-muted-foreground whitespace-nowrap shrink-0 mt-1">
-                    {new Date(n.createdAt).toLocaleDateString("ko-KR")}
-                  </p>
+                  <div className="flex items-center gap-1 shrink-0 mt-1">
+                    <p className="text-xs text-muted-foreground whitespace-nowrap">
+                      {new Date(n.createdAt).toLocaleDateString("ko-KR")}
+                    </p>
+                    {getNavigationPath(n.type, isAdmin) && <ChevronRight size={14} className="text-muted-foreground" />}
+                  </div>
                 </div>
               );
             })}

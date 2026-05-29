@@ -8,6 +8,7 @@ import {
   leaveRequests,
   leaveAdjustments,
   notifications,
+  teams,
   type Employee,
   type InsertEmployee,
   type LeaveBalance,
@@ -17,6 +18,8 @@ import {
   type InsertLeaveAdjustment,
   type InsertNotification,
   type Notification,
+  type Team,
+  type InsertTeam,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
@@ -406,4 +409,101 @@ export async function getAllActiveUsersWithEmployees() {
     .from(users)
     .innerJoin(employees, eq(users.id, employees.userId))
     .where(eq(employees.status, "active"));
+}
+
+// ─── Team helpers ────────────────────────────────────────────────────────────────────
+export async function getAllTeams() {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select({ team: teams, approver: users })
+    .from(teams)
+    .leftJoin(users, eq(teams.approverId, users.id))
+    .orderBy(teams.name);
+}
+
+export async function getTeamById(teamId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db
+    .select({ team: teams, approver: users })
+    .from(teams)
+    .leftJoin(users, eq(teams.approverId, users.id))
+    .where(eq(teams.id, teamId))
+    .limit(1);
+  return result[0];
+}
+
+export async function createTeam(data: InsertTeam): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const result = await db.insert(teams).values(data);
+  return (result as any)[0]?.insertId ?? 0;
+}
+
+export async function updateTeam(teamId: number, data: Partial<InsertTeam>) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(teams).set(data).where(eq(teams.id, teamId));
+}
+
+export async function deleteTeam(teamId: number) {
+  const db = await getDb();
+  if (!db) return;
+  // Unassign employees from this team first
+  await db.update(employees).set({ teamId: null }).where(eq(employees.teamId, teamId));
+  await db.delete(teams).where(eq(teams.id, teamId));
+}
+
+export async function getTeamMembers(teamId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select({ user: users, employee: employees })
+    .from(employees)
+    .innerJoin(users, eq(employees.userId, users.id))
+    .where(eq(employees.teamId, teamId));
+}
+
+export async function getTeamByApproverId(approverId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(teams).where(eq(teams.approverId, approverId));
+}
+
+export async function getPendingRequestsForTeam(teamId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  // Get all userIds in this team
+  const members = await db
+    .select({ userId: employees.userId })
+    .from(employees)
+    .where(eq(employees.teamId, teamId));
+  if (members.length === 0) return [];
+  const memberIds = members.map((m) => m.userId);
+  return db
+    .select({ request: leaveRequests, user: users, employee: employees })
+    .from(leaveRequests)
+    .innerJoin(users, eq(leaveRequests.userId, users.id))
+    .leftJoin(employees, eq(leaveRequests.userId, employees.userId))
+    .where(and(eq(leaveRequests.status, "pending"), inArray(leaveRequests.userId, memberIds)))
+    .orderBy(desc(leaveRequests.createdAt));
+}
+
+export async function getAllRequestsForTeam(teamId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const members = await db
+    .select({ userId: employees.userId })
+    .from(employees)
+    .where(eq(employees.teamId, teamId));
+  if (members.length === 0) return [];
+  const memberIds = members.map((m) => m.userId);
+  return db
+    .select({ request: leaveRequests, user: users, employee: employees })
+    .from(leaveRequests)
+    .innerJoin(users, eq(leaveRequests.userId, users.id))
+    .leftJoin(employees, eq(leaveRequests.userId, employees.userId))
+    .where(inArray(leaveRequests.userId, memberIds))
+    .orderBy(desc(leaveRequests.createdAt));
 }

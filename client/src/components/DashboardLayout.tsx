@@ -6,6 +6,7 @@ import {
   Bell,
   CalendarCheck,
   CalendarDays,
+  CheckSquare,
   ChevronDown,
   ClipboardList,
   Gift,
@@ -33,6 +34,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: "연차 이력", href: "/leave/history", icon: <CalendarCheck size={16} />, adminOnly: false },
   { label: "알림", href: "/notifications", icon: <Bell size={16} /> },
   { label: "내 프로필", href: "/profile", icon: <Settings size={16} /> },
+  { label: "팀 연차 승인", href: "/team/approval", icon: <CheckSquare size={16} /> },
 ];
 
 // Items hidden from admin users (admin has no personal leave)
@@ -45,6 +47,7 @@ const ADMIN_NAV_ITEMS: NavItem[] = [
   { label: "특별 연차 부여", href: "/admin/special-leave", icon: <Gift size={16} />, adminOnly: true },
   { label: "직원 관리", href: "/admin/employees", icon: <Users size={16} />, adminOnly: true },
   { label: "통계 & 내보내기", href: "/admin/stats", icon: <BarChart3 size={16} />, adminOnly: true },
+  { label: "팀 관리", href: "/admin/teams", icon: <Users size={16} />, adminOnly: true },
 ];
 
 /* ─── Sidebar ──────────────────────────────────────────────────────────────── */

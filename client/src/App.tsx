@@ -16,7 +16,8 @@ import AdminEmployees from "./pages/AdminEmployees";
 import AdminStats from "@/pages/AdminStats";
 import AdminLeaveOverview from "@/pages/AdminLeaveOverview";
 import AdminSpecialLeave from "@/pages/AdminSpecialLeave";
-
+import AdminTeams from "@/pages/AdminTeams";
+import TeamApproval from "@/pages/TeamApproval";
 function Router() {
   return (
     <Switch>
@@ -31,6 +32,8 @@ function Router() {
         <Route path="/admin/stats" component={AdminStats} />
         <Route path="/admin/leave-overview" component={AdminLeaveOverview} />
         <Route path="/admin/special-leave" component={AdminSpecialLeave} />
+        <Route path="/admin/teams" component={AdminTeams} />
+        <Route path="/team/approval" component={TeamApproval} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
     </Switch>

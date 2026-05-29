@@ -36,6 +36,15 @@ import {
   getAllLeaveRequestsForExport,
   getAllLeaveBalancesForYear as getAllBalances,
   getAllActiveUsersWithEmployees,
+  getAllTeams,
+  getTeamById,
+  createTeam,
+  updateTeam,
+  deleteTeam,
+  getTeamMembers,
+  getTeamByApproverId,
+  getPendingRequestsForTeam,
+  getAllRequestsForTeam,
 } from "./db";
 import { calculateLeaveEntitlement, calculateDaysForLeaveType, calculateGrantedDaysForYear } from "./leaveCalc";
 import { notifyOwner } from "./_core/notification";
@@ -764,6 +773,87 @@ export async function handleLeaveRenewal() {
   return { renewed, processedAt: today.toISOString() };
 }
 
+// ─── Team Router ──────────────────────────────────────────────────────────────
+const teamRouter = router({
+  listAll: adminProcedure.query(async () => getAllTeams()),
+  create: adminProcedure
+    .input(z.object({ name: z.string().min(1), description: z.string().optional(), approverId: z.number().optional() }))
+    .mutation(async ({ input }) => {
+      const id = await createTeam({ name: input.name, description: input.description ?? null, approverId: input.approverId ?? null });
+      return { id };
+    }),
+  update: adminProcedure
+    .input(z.object({ teamId: z.number(), name: z.string().min(1).optional(), description: z.string().optional(), approverId: z.number().nullable().optional() }))
+    .mutation(async ({ input }) => {
+      const { teamId, ...data } = input;
+      await updateTeam(teamId, data as any);
+      return { success: true };
+    }),
+  delete: adminProcedure
+    .input(z.object({ teamId: z.number() }))
+    .mutation(async ({ input }) => {
+      await deleteTeam(input.teamId);
+      return { success: true };
+    }),
+  assignEmployee: adminProcedure
+    .input(z.object({ userId: z.number(), teamId: z.number().nullable() }))
+    .mutation(async ({ input }) => {
+      const db = await import("./db");
+      await db.updateEmployee(input.userId, { teamId: input.teamId } as any);
+      return { success: true };
+    }),
+  getMyTeams: protectedProcedure.query(async ({ ctx }) => getTeamByApproverId(ctx.user.id)),
+  getPendingRequests: protectedProcedure.query(async ({ ctx }) => {
+    const myTeams = await getTeamByApproverId(ctx.user.id);
+    if (myTeams.length === 0) return [];
+    const all: any[] = [];
+    for (const team of myTeams) {
+      const reqs = await getPendingRequestsForTeam(team.id);
+      all.push(...reqs.map((r) => ({ ...r, teamId: team.id, teamName: team.name })));
+    }
+    return all;
+  }),
+  getAllRequests: protectedProcedure.query(async ({ ctx }) => {
+    const myTeams = await getTeamByApproverId(ctx.user.id);
+    if (myTeams.length === 0) return [];
+    const all: any[] = [];
+    for (const team of myTeams) {
+      const reqs = await getAllRequestsForTeam(team.id);
+      all.push(...reqs.map((r) => ({ ...r, teamId: team.id, teamName: team.name })));
+    }
+    return all;
+  }),
+  approveRequest: protectedProcedure
+    .input(z.object({ requestId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const request = await getLeaveRequestById(input.requestId);
+      if (!request) throw new TRPCError({ code: "NOT_FOUND", message: "신청 건을 찾을 수 없습니다." });
+      const myTeams = await getTeamByApproverId(ctx.user.id);
+      const myTeamIds = myTeams.map((t) => t.id);
+      const emp = await getEmployeeByUserId(request.userId);
+      if (ctx.user.role !== "admin" && (!emp?.teamId || !myTeamIds.includes(emp.teamId))) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "해당 직원의 팀장이 아닙니다." });
+      }
+      await updateLeaveRequestStatus(input.requestId, "approved", ctx.user.id);
+      await createNotification({ userId: request.userId, type: "team_leave_approved", title: "팀장 승인 완료", message: `${request.startDate} ~ ${request.endDate} 연차 신청이 팀장에 의해 승인되었습니다.`, relatedId: input.requestId });
+      return { success: true };
+    }),
+  rejectRequest: protectedProcedure
+    .input(z.object({ requestId: z.number(), reason: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      const request = await getLeaveRequestById(input.requestId);
+      if (!request) throw new TRPCError({ code: "NOT_FOUND", message: "신청 건을 찾을 수 없습니다." });
+      const myTeams = await getTeamByApproverId(ctx.user.id);
+      const myTeamIds = myTeams.map((t) => t.id);
+      const emp = await getEmployeeByUserId(request.userId);
+      if (ctx.user.role !== "admin" && (!emp?.teamId || !myTeamIds.includes(emp.teamId))) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "해당 직원의 팀장이 아닙니다." });
+      }
+      await updateLeaveRequestStatus(input.requestId, "rejected", ctx.user.id, input.reason);
+      await createNotification({ userId: request.userId, type: "team_leave_rejected", title: "팀장 반려", message: `${request.startDate} ~ ${request.endDate} 연차 신청이 반려되었습니다. 사유: ${input.reason}`, relatedId: input.requestId });
+      return { success: true };
+    }),
+});
 // ─── App Router ────────────────────────────────────────────────────────────────
 export const appRouter = router({
   system: systemRouter,
@@ -779,6 +869,7 @@ export const appRouter = router({
   leaveBalance: leaveBalanceRouter,
   leaveRequest: leaveRequestRouter,
   notification: notificationRouter,
+  team: teamRouter,
   admin: adminRouter,
 });
 

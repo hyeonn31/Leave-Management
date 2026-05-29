@@ -36,6 +36,7 @@ export const employees = mysqlTable("employees", {
   department: varchar("department", { length: 100 }),
   position: varchar("position", { length: 100 }),
   entryDate: date("entryDate"),
+  teamId: int("teamId"),
   status: mysqlEnum("status", ["active", "resigned", "on_leave"]).default("active").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -122,6 +123,10 @@ export const notifications = mysqlTable(
       "leave_approved",
       "leave_rejected",
       "leave_renewal",
+      "new_signup",
+      "team_leave_request",
+      "team_leave_approved",
+      "team_leave_rejected",
     ]).notNull(),
     title: varchar("title", { length: 200 }).notNull(),
     message: text("message").notNull(),
@@ -134,3 +139,18 @@ export const notifications = mysqlTable(
 
 export type Notification = typeof notifications.$inferSelect;
 export type InsertNotification = typeof notifications.$inferInsert;
+
+// ─── Teams ────────────────────────────────────────────────────────────────────
+export const teams = mysqlTable(
+  "teams",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    name: varchar("name", { length: 100 }).notNull(),
+    description: text("description"),
+    approverId: int("approverId"), // userId of the team leader/approver
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  }
+);
+export type Team = typeof teams.$inferSelect;
+export type InsertTeam = typeof teams.$inferInsert;
