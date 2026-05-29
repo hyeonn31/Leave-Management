@@ -29,8 +29,9 @@ export default function LeaveRequest() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
 
-  // Admin has no personal leave — redirect to admin dashboard
-  if (user?.role === "admin") {
+  // Owner (system admin) has no personal leave — redirect to admin dashboard
+  const isOwner = (user as { isOwner?: boolean } | null)?.isOwner === true;
+  if (isOwner) {
     setLocation("/admin");
     return null;
   }

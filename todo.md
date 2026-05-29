@@ -53,3 +53,12 @@
 - [x] 연차 신청 폼 잔여일수 미리보기 강화 (경고 배너, 부족 시 제출 차단 개선)
 - [x] 관리자 대시보드 직원 등록 바로가기 버튼 (+ 직원 등록 다이얼로그)
 - [x] 관리자 직원 현황 페이지에서 연차 잔여/사용일수 직접 수정 기능 (수동 조정 다이얼로그)
+
+## 추가 기능 요청 4 (isOwner 기반 분리)
+- [x] auth.me 및 listAll 프로시저에 isOwner 플래그 추가 (OWNER_OPEN_ID 기반)
+- [x] LeaveRequest.tsx: role=admin → isOwner 교체 (오너만 연차 신청 숨김)
+- [x] LeaveHistory.tsx: role=admin → isOwner 교체 (오너만 연차 이력 숨김)
+- [x] AdminEmployees.tsx: isOwner 기반 입사일 숨기기 수정
+- [x] Home.tsx: isOwner 기반 리다이렉트 수정
+- [x] Profile.tsx: isOwner 변수 추가, !hasProfile && !isOwner 조건으로 교체 (오너만 직원 정보 카드 숨김)
+- [x] DashboardLayout.tsx: isOwner 기반 연차 메뉴 숨기기 수정 (일반 admin은 연차 메뉴 표시)

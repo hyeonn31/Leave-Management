@@ -77,7 +77,10 @@ export default function Profile() {
   }
 
   const hasProfile = !!profile?.employee?.entryDate;
+  // isAdmin: role=admin 계정 (오너 포함 모든 관리자) — 수정 버튼/입력 필드 표시 기준
   const isAdmin = user?.role === "admin";
+  // isOwner: 시스템 오너 계정 (able_dinner_order@ablegames.com) — 직원 정보 카드 숨김 기준
+  const isOwner = (user as { isOwner?: boolean } | null)?.isOwner === true;
 
   return (
     <DashboardLayout>
@@ -114,7 +117,8 @@ export default function Profile() {
         </div>
 
         {/* Employee profile card */}
-        {!hasProfile && !isAdmin ? (
+        {/* 오너 계정(isOwner=true)은 직원 정보 카드 자체를 숨김 */}
+        {!hasProfile && !isOwner ? (
           /* ── 미등록 일반 직원: 관리자 처리 대기 안내 ── */
           <div className="bg-card rounded-2xl shadow-card overflow-hidden">
             <div className="px-5 py-4 border-b border-border flex items-center gap-2">

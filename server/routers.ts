@@ -1,5 +1,6 @@
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
+import { ENV } from "./_core/env";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
@@ -103,7 +104,8 @@ const employeeRouter = router({
     }),
   // Admin: list all employees
   listAll: adminProcedure.query(async () => {
-    return getAllEmployeesWithUsers();
+    const rows = await getAllEmployeesWithUsers();
+    return rows.map((r) => ({ ...r, isOwner: r.user.openId === ENV.ownerOpenId }));
   }),
   // Admin: list all users (for employee registration dialog)
   listAllUsers: adminProcedure.query(async () => {
@@ -876,7 +878,11 @@ const teamRouter = router({
 export const appRouter = router({
   system: systemRouter,
   auth: router({
-    me: publicProcedure.query((opts) => opts.ctx.user),
+    me: publicProcedure.query((opts) => {
+      const user = opts.ctx.user;
+      if (!user) return null;
+      return { ...user, isOwner: user.openId === ENV.ownerOpenId };
+    }),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });

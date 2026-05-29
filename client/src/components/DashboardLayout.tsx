@@ -54,11 +54,13 @@ const ADMIN_NAV_ITEMS: NavItem[] = [
 function Sidebar({
   user,
   isAdmin,
+  isOwner,
   unreadCount,
   onClose,
 }: {
   user: { name?: string | null; email?: string | null };
   isAdmin: boolean;
+  isOwner: boolean;
   unreadCount: number;
   onClose?: () => void;
 }) {
@@ -131,7 +133,7 @@ function Sidebar({
         <p className="px-3 pb-2 text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--color-sidebar-muted)" }}>
           메뉴
         </p>
-        {NAV_ITEMS.filter((item) => !(isAdmin && EMPLOYEE_ONLY_HREFS.includes(item.href))).map((item) => (
+        {NAV_ITEMS.filter((item) => !(isOwner && EMPLOYEE_ONLY_HREFS.includes(item.href))).map((item) => (
           <Link
             key={item.href}
             href={item.href}
@@ -259,6 +261,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const overlayRef = useRef<HTMLDivElement>(null);
 
   const isAdmin = user?.role === "admin";
+  // isOwner: 시스템 오너 계정만 연차 메뉴 숨김 (일반 admin은 연차 메뉴 표시)
+  const isOwner = (user as { isOwner?: boolean } | null)?.isOwner === true;
 
   const { data: notifData } = trpc.notification.list.useQuery(
     undefined,
@@ -349,6 +353,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <Sidebar
           user={user!}
           isAdmin={isAdmin}
+          isOwner={isOwner}
           unreadCount={unreadCount}
           onClose={() => setSidebarOpen(false)}
         />

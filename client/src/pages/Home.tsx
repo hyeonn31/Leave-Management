@@ -33,24 +33,23 @@ const STATUS_CONFIG = {
 export default function Home() {
   const { user } = useAuth();
   const [, navigate] = useLocation();
-  const isAdmin = user?.role === "admin";
+    const isAdmin = user?.role === "admin";
+  const isOwner = (user as { isOwner?: boolean } | null)?.isOwner === true;
   const currentYear = new Date().getFullYear();
   const [year] = useState(currentYear);
-
-  // Redirect admin users to admin dashboard
+  // Redirect owner (system admin) to admin dashboard
   useEffect(() => {
-    if (isAdmin) navigate("/admin");
-  }, [isAdmin, navigate]);
-
+    if (isOwner) navigate("/admin");
+  }, [isOwner, navigate]);
   const { data: balance, isLoading: balLoading } = trpc.leaveBalance.getMyBalance.useQuery(
     { fiscalYear: year },
-    { enabled: !isAdmin }
+    { enabled: !isOwner }
   );
   const { data: requests, isLoading: reqLoading } = trpc.leaveRequest.myList.useQuery(
     { fiscalYear: year },
-    { enabled: !isAdmin }
+    { enabled: !isOwner }
   );
-  const { data: employee } = trpc.employee.getMyProfile.useQuery(undefined, { enabled: !isAdmin });
+  const { data: employee } = trpc.employee.getMyProfile.useQuery(undefined, { enabled: !isOwner });
 
   const recent = (requests ?? []).slice(0, 5);
   const pending = (requests ?? []).filter((r: any) => r.status === "pending").length;

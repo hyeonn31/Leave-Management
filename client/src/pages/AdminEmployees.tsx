@@ -17,6 +17,7 @@ function toDateInputValue(val: unknown): string {
 
 type EmployeeRow = {
   user: { id: number; name: string | null; email: string | null; role: "user" | "admin" };
+  isOwner?: boolean;
   employee: {
     employeeNumber: string | null;
     department: string | null;
@@ -220,7 +221,7 @@ export default function AdminEmployees() {
                     <td className="px-4 py-3 text-muted-foreground">{row.employee?.department ?? "-"}</td>
                     <td className="px-4 py-3 text-muted-foreground">{row.employee?.position ?? "-"}</td>
                     <td className="px-4 py-3 text-muted-foreground font-mono text-xs">
-                      {row.user.role === "admin" ? <span className="text-muted-foreground/30">-</span> : (toDateInputValue(row.employee?.entryDate) || "-")}
+                      {row.isOwner ? <span className="text-muted-foreground/30">-</span> : (toDateInputValue(row.employee?.entryDate) || "-")}
                     </td>
                     <td className="px-4 py-3">
                       {row.employee ? (
@@ -316,7 +317,7 @@ export default function AdminEmployees() {
               />
             </div>
 
-            {form.role !== "admin" && (
+            {!editTarget?.isOwner && (
             <div>
               <label className="block text-xs font-medium text-muted-foreground mb-1.5">입사일</label>
               <input
