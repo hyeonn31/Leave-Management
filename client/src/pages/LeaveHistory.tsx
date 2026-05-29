@@ -1,7 +1,8 @@
+import DashboardLayout from "@/components/DashboardLayout";
 import { trpc } from "@/lib/trpc";
+import { CalendarDays, CalendarX, CheckCircle, AlertCircle, XCircle, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { Trash2 } from "lucide-react";
 
 const LEAVE_TYPE_LABELS: Record<string, string> = {
   annual: "연차",
@@ -12,15 +13,10 @@ const LEAVE_TYPE_LABELS: Record<string, string> = {
   unpaid: "무급 휴가",
 };
 
-const STATUS_STYLES: Record<string, string> = {
-  pending: "bg-amber-50 text-amber-700 border-amber-200",
-  approved: "bg-green-50 text-green-700 border-green-200",
-  rejected: "bg-red-50 text-red-700 border-red-200",
-};
-const STATUS_LABELS: Record<string, string> = {
-  pending: "대기",
-  approved: "승인",
-  rejected: "반려",
+const STATUS_CONFIG = {
+  pending:  { label: "대기중",  icon: <AlertCircle size={11} />, cls: "status-pending" },
+  approved: { label: "승인됨",  icon: <CheckCircle size={11} />, cls: "status-approved" },
+  rejected: { label: "반려됨",  icon: <XCircle size={11} />,    cls: "status-rejected" },
 };
 
 export default function LeaveHistory() {
@@ -28,10 +24,8 @@ export default function LeaveHistory() {
   const [selectedYear, setSelectedYear] = useState(currentYear);
   const years = [currentYear - 1, currentYear];
 
-  const { data: requests, isLoading } = trpc.leaveRequest.myList.useQuery({
-    fiscalYear: selectedYear,
-  });
   const { data: balance } = trpc.leaveBalance.getMyBalance.useQuery({ fiscalYear: selectedYear });
+  const { data: requests, isLoading } = trpc.leaveRequest.myList.useQuery({ fiscalYear: selectedYear });
   const utils = trpc.useUtils();
 
   const cancel = trpc.leaveRequest.cancel.useMutation({
@@ -44,129 +38,119 @@ export default function LeaveHistory() {
   });
 
   return (
-    <div className="p-8 max-w-4xl animate-fade-in">
-      {/* Header */}
-      <div className="mb-10">
-        <div className="flex items-center gap-3 mb-1">
-          <div className="w-4 h-4 bg-red-accent" />
-          <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground">
-            연차 사용 내역
-          </p>
-        </div>
-        <div className="flex items-end justify-between">
-          <h1 className="text-4xl font-black tracking-tight">내 연차 이력</h1>
-          {/* Year selector */}
-          <div className="flex gap-0 border border-border">
-            {years.map((y) => (
-              <button
-                key={y}
-                onClick={() => setSelectedYear(y)}
-                className={`px-4 py-2 text-sm font-mono transition-colors btn-press ${
-                  selectedYear === y
-                    ? "bg-foreground text-background"
-                    : "hover:bg-muted"
-                }`}
-              >
-                {y}년
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="its-rule mt-4" />
+    <DashboardLayout>
+      {/* Year tabs */}
+      <div className="flex items-center gap-2 mb-6">
+        {years.map((y) => (
+          <button
+            key={y}
+            onClick={() => setSelectedYear(y)}
+            className={`pill-tab ${selectedYear === y ? "active" : ""}`}
+          >
+            {y}년
+          </button>
+        ))}
       </div>
 
-      {/* Balance summary */}
-      {balance && (
-        <div className="grid grid-cols-3 gap-0 border border-border mb-8">
-          {[
-            { label: "총 부여", value: `${Number(balance.totalGranted)}일` },
-            { label: "사용", value: `${Number(balance.used)}일` },
-            { label: "잔여", value: `${Number(balance.remaining)}일` },
-          ].map((item, i) => (
-            <div key={item.label} className={`p-4 ${i > 0 ? "border-l border-border" : ""}`}>
-              <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-1">
-                {item.label}
-              </p>
-              <p className="text-xl font-black font-mono">{item.value}</p>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Request list */}
-      {isLoading ? (
-        <div className="space-y-2">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-16 bg-muted animate-pulse" />
-          ))}
-        </div>
-      ) : requests && requests.length > 0 ? (
-        <div className="border border-border">
-          {/* Table header */}
-          <div className="grid grid-cols-12 gap-0 border-b border-foreground bg-foreground text-background">
-            <div className="col-span-2 px-4 py-3 text-xs font-mono uppercase tracking-widest">종류</div>
-            <div className="col-span-4 px-4 py-3 text-xs font-mono uppercase tracking-widest">기간</div>
-            <div className="col-span-1 px-4 py-3 text-xs font-mono uppercase tracking-widest text-right">일수</div>
-            <div className="col-span-2 px-4 py-3 text-xs font-mono uppercase tracking-widest">상태</div>
-            <div className="col-span-2 px-4 py-3 text-xs font-mono uppercase tracking-widest">신청일</div>
-            <div className="col-span-1 px-4 py-3" />
+      {/* Balance cards */}
+      <div className="grid grid-cols-3 gap-3 mb-6">
+        {[
+          { label: "총 부여", value: balance?.totalGranted ?? 0, color: "var(--color-primary)" },
+          { label: "사용",    value: balance?.used ?? 0,         color: "oklch(75% 0.18 85)" },
+          { label: "잔여",    value: balance?.remaining ?? 0,    color: "oklch(60% 0.18 145)" },
+        ].map((s) => (
+          <div key={s.label} className="bg-card rounded-2xl p-4 shadow-card text-center">
+            <p className="text-xs text-muted-foreground mb-1">{s.label}</p>
+            <p className="text-2xl font-bold" style={{ color: s.color }}>
+              {Number(s.value)}<span className="text-sm font-medium text-muted-foreground ml-0.5">일</span>
+            </p>
           </div>
-          {requests.map((req, i) => (
-            <div
-              key={req.id}
-              className={`grid grid-cols-12 gap-0 items-center ${
-                i < requests.length - 1 ? "border-b border-border" : ""
-              } hover:bg-muted/50 transition-colors`}
-            >
-              <div className="col-span-2 px-4 py-3 text-sm font-medium">
-                {LEAVE_TYPE_LABELS[req.leaveType]}
-              </div>
-              <div className="col-span-4 px-4 py-3 text-sm font-mono text-muted-foreground">
-                {String(req.startDate)} ~ {String(req.endDate)}
-              </div>
-              <div className="col-span-1 px-4 py-3 text-sm font-mono text-right">
-                {Number(req.totalDays)}일
-              </div>
-              <div className="col-span-2 px-4 py-3">
-                <span
-                  className={`text-[10px] font-mono px-2 py-0.5 border uppercase ${STATUS_STYLES[req.status]}`}
-                >
-                  {STATUS_LABELS[req.status]}
-                </span>
-              </div>
-              <div className="col-span-2 px-4 py-3 text-xs font-mono text-muted-foreground">
-                {new Date(req.createdAt).toLocaleDateString("ko-KR")}
-              </div>
-              <div className="col-span-1 px-4 py-3 flex justify-end">
-                {req.status === "pending" && (
-                  <button
-                    onClick={() => {
-                      if (confirm("연차 신청을 취소하시겠습니까?")) {
-                        cancel.mutate({ id: req.id });
-                      }
-                    }}
-                    className="p-1.5 hover:bg-red-50 hover:text-red-600 transition-colors"
-                    title="취소"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                )}
-              </div>
-              {req.status === "rejected" && req.rejectionReason && (
-                <div className="col-span-12 px-4 pb-3 -mt-1">
-                  <p className="text-xs text-red-600 font-mono bg-red-50 px-3 py-1.5">
-                    반려 사유: {req.rejectionReason}
-                  </p>
+        ))}
+      </div>
+
+      {/* Requests list */}
+      <div className="bg-card rounded-2xl shadow-card overflow-hidden">
+        <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+          <div>
+            <h3 className="font-semibold text-foreground">{selectedYear}년 연차 신청 내역</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">총 {(requests ?? []).length}건</p>
+          </div>
+        </div>
+
+        {isLoading ? (
+          <div className="p-5 space-y-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-14 bg-muted rounded-xl animate-pulse" />
+            ))}
+          </div>
+        ) : (requests ?? []).length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <CalendarX size={36} className="text-muted-foreground mb-3" />
+            <p className="text-sm font-medium text-muted-foreground">{selectedYear}년 연차 신청 내역이 없습니다</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-border">
+            {(requests as any[]).map((r) => {
+              const st = STATUS_CONFIG[r.status as keyof typeof STATUS_CONFIG] ?? STATUS_CONFIG.pending;
+              return (
+                <div key={r.id} className="hover:bg-muted/30 transition-colors">
+                  <div className="flex items-center gap-4 px-5 py-4">
+                    <div
+                      className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+                      style={{ background: "oklch(93% 0.06 264)" }}
+                    >
+                      <CalendarDays size={16} style={{ color: "var(--color-primary)" }} />
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <p className="text-sm font-semibold text-foreground">
+                          {LEAVE_TYPE_LABELS[r.leaveType] ?? r.leaveType}
+                        </p>
+                        <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                          {r.totalDays}일
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {String(r.startDate).slice(0, 10)} ~ {String(r.endDate).slice(0, 10)}
+                        {r.reason && ` · ${r.reason}`}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-3 shrink-0">
+                      <span className={st.cls}>
+                        {st.icon}
+                        {st.label}
+                      </span>
+                      <span className="text-xs text-muted-foreground hidden sm:block">
+                        {new Date(r.createdAt).toLocaleDateString("ko-KR")}
+                      </span>
+                      {r.status === "pending" && (
+                        <button
+                          onClick={() => {
+                            if (confirm("연차 신청을 취소하시겠습니까?")) cancel.mutate({ id: r.id });
+                          }}
+                          className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                          title="취소"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  {r.status === "rejected" && r.rejectionReason && (
+                    <div className="px-5 pb-3 -mt-1 ml-14">
+                      <p className="text-xs text-destructive bg-red-50 px-3 py-1.5 rounded-lg">
+                        반려 사유: {r.rejectionReason}
+                      </p>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="border border-border p-16 text-center">
-          <p className="text-sm text-muted-foreground">{selectedYear}년 연차 신청 내역이 없습니다.</p>
-        </div>
-      )}
-    </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </DashboardLayout>
   );
 }

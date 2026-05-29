@@ -1,181 +1,234 @@
 @import "tailwindcss";
 @import "tw-animate-css";
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&family=IBM+Plex+Mono:wght@400;500&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap");
 
 @custom-variant dark (&:is(.dark *));
 
-/* ─── International Typographic Style Design Tokens ─────────────────────────── */
+/* ─── Design Tokens ─────────────────────────────────────────────────────────── */
 @theme inline {
-  --color-background: oklch(1 0 0);
-  --color-foreground: oklch(0.09 0 0);
-  --color-card: oklch(1 0 0);
-  --color-card-foreground: oklch(0.09 0 0);
-  --color-popover: oklch(1 0 0);
-  --color-popover-foreground: oklch(0.09 0 0);
-  --color-primary: oklch(0.09 0 0);
-  --color-primary-foreground: oklch(1 0 0);
-  --color-secondary: oklch(0.96 0 0);
-  --color-secondary-foreground: oklch(0.09 0 0);
-  --color-muted: oklch(0.96 0 0);
-  --color-muted-foreground: oklch(0.45 0 0);
-  --color-accent: oklch(0.96 0 0);
-  --color-accent-foreground: oklch(0.09 0 0);
-  --color-destructive: oklch(0.55 0.22 27);
-  --color-destructive-foreground: oklch(1 0 0);
-  --color-border: oklch(0.88 0 0);
-  --color-input: oklch(0.88 0 0);
-  --color-ring: oklch(0.09 0 0);
-  --color-sidebar: oklch(0.985 0 0);
-  --color-sidebar-foreground: oklch(0.09 0 0);
-  --color-sidebar-border: oklch(0.88 0 0);
-  --color-sidebar-accent: oklch(0.96 0 0);
-  --color-sidebar-accent-foreground: oklch(0.09 0 0);
-  --color-sidebar-primary: oklch(0.09 0 0);
-  --color-sidebar-primary-foreground: oklch(1 0 0);
-  --color-sidebar-ring: oklch(0.09 0 0);
+  /* Colors — Fingoals-inspired: white canvas, blue accent, dark sidebar */
+  --color-background:        oklch(99% 0 0);
+  --color-foreground:        oklch(13% 0 0);
+  --color-card:              oklch(100% 0 0);
+  --color-card-foreground:   oklch(13% 0 0);
+  --color-popover:           oklch(100% 0 0);
+  --color-popover-foreground: oklch(13% 0 0);
 
-  /* Red accent — the signature ITS point color */
-  --color-red-accent: oklch(0.52 0.22 27);
-  --color-red-accent-light: oklch(0.96 0.04 27);
+  /* Blue primary — #2563EB */
+  --color-primary:           oklch(52% 0.22 264);
+  --color-primary-foreground: oklch(100% 0 0);
 
-  --radius-sm: 0px;
-  --radius-md: 0px;
-  --radius-lg: 0px;
-  --radius-xl: 0px;
-  --radius: 0px;
+  /* Secondary — light blue tint */
+  --color-secondary:         oklch(95% 0.04 264);
+  --color-secondary-foreground: oklch(40% 0.12 264);
 
-  --font-sans: "Inter", system-ui, sans-serif;
-  --font-mono: "IBM Plex Mono", monospace;
+  /* Muted — light gray */
+  --color-muted:             oklch(96% 0 0);
+  --color-muted-foreground:  oklch(55% 0 0);
 
-  --shadow-sm: 0 1px 0 0 oklch(0.88 0 0);
-  --shadow-md: 0 0 0 1px oklch(0.88 0 0);
-  --shadow-lg: 0 4px 0 0 oklch(0.09 0 0);
+  /* Accent — blue tint */
+  --color-accent:            oklch(93% 0.06 264);
+  --color-accent-foreground: oklch(40% 0.15 264);
+
+  /* Destructive */
+  --color-destructive:       oklch(58% 0.22 27);
+  --color-destructive-foreground: oklch(100% 0 0);
+
+  /* Success */
+  --color-success:           oklch(60% 0.18 145);
+  --color-success-foreground: oklch(100% 0 0);
+
+  /* Warning */
+  --color-warning:           oklch(75% 0.18 85);
+  --color-warning-foreground: oklch(20% 0 0);
+
+  /* Border / Input / Ring */
+  --color-border:            oklch(91% 0 0);
+  --color-input:             oklch(91% 0 0);
+  --color-ring:              oklch(52% 0.22 264);
+
+  /* Sidebar — dark navy */
+  --color-sidebar:           oklch(16% 0.02 264);
+  --color-sidebar-foreground: oklch(90% 0 0);
+  --color-sidebar-muted:     oklch(50% 0.02 264);
+  --color-sidebar-accent:    oklch(24% 0.04 264);
+  --color-sidebar-accent-foreground: oklch(95% 0 0);
+  --color-sidebar-border:    oklch(22% 0.02 264);
+  --color-sidebar-primary:   oklch(52% 0.22 264);
+  --color-sidebar-primary-foreground: oklch(100% 0 0);
+
+  /* Chart colors */
+  --color-chart-1:           oklch(52% 0.22 264);
+  --color-chart-2:           oklch(65% 0.18 264);
+  --color-chart-3:           oklch(75% 0.12 264);
+  --color-chart-4:           oklch(85% 0.08 264);
+  --color-chart-5:           oklch(60% 0.20 145);
+
+  /* Typography */
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Inter", ui-monospace, monospace;
+
+  /* Radius — rounded like Fingoals */
+  --radius: 0.875rem;
+
+  /* Shadows */
+  --shadow-card: 0 1px 3px oklch(0% 0 0 / 0.06), 0 4px 16px oklch(0% 0 0 / 0.06);
+  --shadow-card-hover: 0 4px 12px oklch(0% 0 0 / 0.10), 0 8px 32px oklch(0% 0 0 / 0.08);
+  --shadow-dropdown: 0 8px 24px oklch(0% 0 0 / 0.12);
+
+  /* Easings */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
 }
 
-/* ─── Base Layer ─────────────────────────────────────────────────────────────── */
+/* ─── Base ──────────────────────────────────────────────────────────────────── */
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border;
     box-sizing: border-box;
   }
 
-  body {
-    @apply bg-background text-foreground;
-    font-family: var(--font-sans);
-    font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
+  html {
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 
-  /* ITS: strict typographic hierarchy */
-  h1 {
-    @apply text-4xl font-black tracking-tight leading-none;
-    letter-spacing: -0.03em;
-  }
-  h2 {
-    @apply text-2xl font-bold tracking-tight;
-    letter-spacing: -0.02em;
-  }
-  h3 {
-    @apply text-lg font-semibold tracking-tight;
-  }
-  h4 {
-    @apply text-base font-semibold;
+  body {
+    @apply bg-background text-foreground font-sans;
+    font-size: 14px;
+    line-height: 1.5;
   }
 
-  /* ITS: thin rule lines */
-  hr {
-    @apply border-t border-border;
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: oklch(82% 0 0); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: oklch(70% 0 0); }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold tracking-tight;
+    line-height: 1.25;
   }
 }
 
-/* ─── ITS Utility Classes ────────────────────────────────────────────────────── */
+/* ─── Utilities ─────────────────────────────────────────────────────────────── */
 @layer utilities {
+  /* Flex min-size reset */
+  .flex { min-width: 0; min-height: 0; }
+
+  /* Container */
   .container {
-    @apply mx-auto px-6;
-    max-width: 1440px;
+    @apply mx-auto px-4 sm:px-6 lg:px-8;
+    max-width: 1280px;
   }
 
-  /* Red accent utilities */
-  .text-red-accent {
-    color: var(--color-red-accent);
-  }
-  .bg-red-accent {
-    background-color: var(--color-red-accent);
-  }
-  .border-red-accent {
-    border-color: var(--color-red-accent);
-  }
-  .bg-red-accent-light {
-    background-color: var(--color-red-accent-light);
+  /* Card shadow utility */
+  .shadow-card { box-shadow: var(--shadow-card); }
+  .shadow-card-hover { box-shadow: var(--shadow-card-hover); }
+
+  /* Blue gradient badge */
+  .badge-blue {
+    @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium;
+    background: oklch(93% 0.06 264);
+    color: oklch(40% 0.18 264);
   }
 
-  /* ITS grid rule — thin black line */
-  .its-rule {
-    @apply border-b border-foreground;
-  }
-  .its-rule-light {
-    @apply border-b border-border;
+  /* Stat card */
+  .stat-card {
+    @apply bg-card rounded-2xl p-5 shadow-card;
   }
 
-  /* ITS square badge */
-  .its-badge {
-    @apply inline-flex items-center px-2 py-0.5 text-xs font-mono font-medium uppercase tracking-widest;
-    border: 1px solid currentColor;
+  /* Sidebar nav item */
+  .nav-item {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150;
+    color: var(--color-sidebar-muted);
+  }
+  .nav-item:hover {
+    background: var(--color-sidebar-accent);
+    color: var(--color-sidebar-foreground);
+  }
+  .nav-item.active {
+    background: var(--color-primary);
+    color: var(--color-primary-foreground);
   }
 
-  /* ITS stat block */
-  .its-stat {
-    @apply border-l-4 border-foreground pl-4;
+  /* Blue button */
+  .btn-primary {
+    @apply inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold;
+    background: var(--color-primary);
+    color: var(--color-primary-foreground);
+    transition: opacity 150ms var(--ease-out), transform 150ms var(--ease-out);
   }
-  .its-stat-red {
-    @apply border-l-4 pl-4;
-    border-left-color: var(--color-red-accent);
+  .btn-primary:hover { opacity: 0.9; }
+  .btn-primary:active { transform: scale(0.97); }
+
+  /* Ghost button */
+  .btn-ghost {
+    @apply inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium;
+    color: var(--color-muted-foreground);
+    transition: background 150ms var(--ease-out), color 150ms var(--ease-out);
+  }
+  .btn-ghost:hover {
+    background: var(--color-muted);
+    color: var(--color-foreground);
   }
 
-  /* Button active press */
-  .btn-press {
-    @apply transition-transform duration-150;
+  /* Pill tab */
+  .pill-tab {
+    @apply px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-150;
+    color: var(--color-muted-foreground);
   }
-  .btn-press:active {
-    transform: scale(0.97);
+  .pill-tab:hover { color: var(--color-foreground); }
+  .pill-tab.active {
+    background: var(--color-primary);
+    color: var(--color-primary-foreground);
   }
 
-  /* Flex min-width fix */
-  .flex {
-    min-width: 0;
-    min-height: 0;
+  /* Status badges */
+  .status-pending  { @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700; }
+  .status-approved { @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700; }
+  .status-rejected { @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-600; }
+
+  /* Dark card (like Fingoals black card) */
+  .card-dark {
+    @apply rounded-2xl p-5;
+    background: oklch(13% 0.02 264);
+    color: oklch(95% 0 0);
   }
+
+  /* Blue card */
+  .card-blue {
+    @apply rounded-2xl p-5;
+    background: var(--color-primary);
+    color: var(--color-primary-foreground);
+  }
+
+  /* Progress ring */
+  .progress-ring { transform-origin: center; transform: rotate(-90deg); }
+
+  /* Micro interaction */
+  .interactive {
+    transition: transform 150ms var(--ease-out), box-shadow 150ms var(--ease-out);
+  }
+  .interactive:hover { transform: translateY(-1px); box-shadow: var(--shadow-card-hover); }
+  .interactive:active { transform: scale(0.98); }
 }
 
-/* ─── Scrollbar ──────────────────────────────────────────────────────────────── */
-::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: oklch(0.75 0 0);
-}
-::-webkit-scrollbar-thumb:hover {
-  background: oklch(0.5 0 0);
-}
-
-/* ─── Animations ─────────────────────────────────────────────────────────────── */
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(4px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-.animate-fade-in {
-  animation: fadeIn 200ms cubic-bezier(0.23, 1, 0.32, 1) both;
-}
-
-@keyframes slideInLeft {
-  from { opacity: 0; transform: translateX(-8px); }
-  to   { opacity: 1; transform: translateX(0); }
-}
-.animate-slide-in {
-  animation: slideInLeft 200ms cubic-bezier(0.23, 1, 0.32, 1) both;
+/* ─── Animation ─────────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: no-preference) {
+  .animate-in {
+    animation: fadeIn 200ms var(--ease-out) both;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .animate-slide-in {
+    animation: slideIn 250ms var(--ease-out) both;
+  }
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateX(-8px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
 }

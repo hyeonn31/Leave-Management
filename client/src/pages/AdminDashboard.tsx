@@ -1,16 +1,12 @@
+import DashboardLayout from "@/components/DashboardLayout";
 import { trpc } from "@/lib/trpc";
 import { useState } from "react";
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Cell,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  LineChart, Line, Cell,
 } from "recharts";
 import { useLocation } from "wouter";
+import { Users, CalendarDays, TrendingUp, Clock, ArrowRight } from "lucide-react";
 
 const MONTHS = ["1월","2월","3월","4월","5월","6월","7월","8월","9월","10월","11월","12월"];
 
@@ -19,19 +15,13 @@ export default function AdminDashboard() {
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState(currentYear);
 
-  const { data: summary, isLoading: summaryLoading } = trpc.admin.summary.useQuery({
-    fiscalYear: selectedYear,
-  });
+  const { data: summary, isLoading: summaryLoading } = trpc.admin.summary.useQuery({ fiscalYear: selectedYear });
   const { data: deptStats } = trpc.admin.departmentStats.useQuery({ fiscalYear: selectedYear });
   const { data: monthlyStats } = trpc.admin.monthlyStats.useQuery({ fiscalYear: selectedYear });
 
   const monthlyChartData = MONTHS.map((month, i) => {
     const stat = monthlyStats?.find((s) => Number(s.month) === i + 1);
-    return {
-      month,
-      건수: Number(stat?.count ?? 0),
-      일수: Number(stat?.totalDays ?? 0),
-    };
+    return { month, 건수: Number(stat?.count ?? 0), 일수: Number(stat?.totalDays ?? 0) };
   });
 
   const deptChartData = (deptStats ?? []).map((d) => ({
@@ -40,135 +30,116 @@ export default function AdminDashboard() {
     인원: Number(d.employeeCount),
   }));
 
+  const kpis = [
+    { icon: <Users size={18} />, label: "전체 직원",   value: summaryLoading ? "—" : `${summary?.totalEmployees ?? 0}명`,  color: "var(--color-primary)" },
+    { icon: <CalendarDays size={18} />, label: "총 부여 연차", value: summaryLoading ? "—" : `${summary?.totalGranted ?? 0}일`,   color: "oklch(60% 0.18 145)" },
+    { icon: <TrendingUp size={18} />, label: "전사 소진율",  value: summaryLoading ? "—" : `${summary?.usageRate ?? 0}%`,    color: "oklch(60% 0.18 85)" },
+    { icon: <Clock size={18} />, label: "대기 신청",    value: summaryLoading ? "—" : `${summary?.pendingCount ?? 0}건`,   color: (summary?.pendingCount ?? 0) > 0 ? "oklch(55% 0.22 25)" : "var(--color-primary)" },
+  ];
+
+  const quickLinks = [
+    { label: "연차 신청 관리", path: "/admin/requests", desc: "승인·반려 처리" },
+    { label: "직원 관리",     path: "/admin/employees", desc: "프로필·연차 재계산" },
+    { label: "통계 & 내보내기", path: "/admin/stats",  desc: "CSV 다운로드" },
+  ];
+
   return (
-    <div className="p-8 max-w-6xl animate-fade-in">
-      {/* Header */}
-      <div className="mb-10">
-        <div className="flex items-center gap-3 mb-1">
-          <div className="w-4 h-4 bg-red-accent" />
-          <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground">
-            관리자 대시보드
-          </p>
-        </div>
-        <div className="flex items-end justify-between">
-          <h1 className="text-4xl font-black tracking-tight">전사 연차 현황</h1>
-          <div className="flex gap-0 border border-border">
-            {[currentYear - 1, currentYear].map((y) => (
-              <button
-                key={y}
-                onClick={() => setSelectedYear(y)}
-                className={`px-4 py-2 text-sm font-mono transition-colors btn-press ${
-                  selectedYear === y ? "bg-foreground text-background" : "hover:bg-muted"
-                }`}
-              >
-                {y}년
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="its-rule mt-4" />
+    <DashboardLayout>
+      {/* Year tabs */}
+      <div className="flex items-center gap-2 mb-6">
+        {[currentYear - 1, currentYear].map((y) => (
+          <button key={y} onClick={() => setSelectedYear(y)} className={`pill-tab ${selectedYear === y ? "active" : ""}`}>
+            {y}년
+          </button>
+        ))}
       </div>
 
       {/* KPI cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-0 border border-border mb-10">
-        {[
-          { label: "전체 직원", value: summaryLoading ? "—" : `${summary?.totalEmployees ?? 0}명`, accent: false },
-          { label: "총 부여 연차", value: summaryLoading ? "—" : `${summary?.totalGranted ?? 0}일`, accent: false },
-          { label: "전사 소진율", value: summaryLoading ? "—" : `${summary?.usageRate ?? 0}%`, accent: true },
-          { label: "대기 신청", value: summaryLoading ? "—" : `${summary?.pendingCount ?? 0}건`, accent: (summary?.pendingCount ?? 0) > 0 },
-        ].map((item, i) => (
-          <div
-            key={item.label}
-            className={`p-6 ${i > 0 ? "border-l border-border" : ""} ${
-              item.accent ? "bg-foreground text-background" : ""
-            }`}
-          >
-            <p className={`text-xs font-mono uppercase tracking-widest mb-2 ${item.accent ? "text-white/60" : "text-muted-foreground"}`}>
-              {item.label}
-            </p>
-            <p className="text-3xl font-black font-mono">{item.value}</p>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+        {kpis.map((k) => (
+          <div key={k.label} className="bg-card rounded-2xl p-5 shadow-card">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs text-muted-foreground">{k.label}</p>
+              <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "oklch(93% 0.06 264)", color: k.color }}>
+                {k.icon}
+              </div>
+            </div>
+            <p className="text-2xl font-bold" style={{ color: k.color }}>{k.value}</p>
           </div>
         ))}
       </div>
 
-      {/* Quick actions */}
-      <div className="flex gap-3 mb-10">
-        <button
-          onClick={() => setLocation("/admin/requests")}
-          className="px-6 py-3 border border-foreground text-sm font-semibold uppercase tracking-widest hover:bg-foreground hover:text-background transition-colors btn-press"
-        >
-          연차 신청 관리 →
-        </button>
-        <button
-          onClick={() => setLocation("/admin/employees")}
-          className="px-6 py-3 border border-border text-sm font-semibold uppercase tracking-widest hover:bg-muted transition-colors btn-press"
-        >
-          직원 관리 →
-        </button>
-        <button
-          onClick={() => setLocation("/admin/stats")}
-          className="px-6 py-3 border border-border text-sm font-semibold uppercase tracking-widest hover:bg-muted transition-colors btn-press"
-        >
-          통계 & 내보내기 →
-        </button>
+      {/* Quick links */}
+      <div className="grid grid-cols-3 gap-3 mb-6">
+        {quickLinks.map((l) => (
+          <button
+            key={l.path}
+            onClick={() => setLocation(l.path)}
+            className="bg-card rounded-2xl p-4 shadow-card text-left hover:shadow-lg transition-shadow group"
+          >
+            <p className="font-semibold text-foreground text-sm mb-0.5">{l.label}</p>
+            <p className="text-xs text-muted-foreground">{l.desc}</p>
+            <ArrowRight size={14} className="mt-2 text-muted-foreground group-hover:text-primary transition-colors" />
+          </button>
+        ))}
       </div>
 
       {/* Charts */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {/* Monthly chart */}
-        <div className="border border-border p-6">
-          <h2 className="text-sm font-bold uppercase tracking-widest mb-6">
-            월별 연차 신청 현황
-          </h2>
-          <div className="h-52">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Monthly line chart */}
+        <div className="bg-card rounded-2xl shadow-card p-5">
+          <h3 className="font-semibold text-foreground text-sm mb-4">월별 연차 신청 건수</h3>
+          <div className="h-48">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={monthlyChartData} barSize={16}>
-                <CartesianGrid strokeDasharray="2 2" stroke="#e5e5e5" />
-                <XAxis dataKey="month" tick={{ fontSize: 10, fontFamily: "IBM Plex Mono" }} />
-                <YAxis tick={{ fontSize: 10, fontFamily: "IBM Plex Mono" }} />
+              <LineChart data={monthlyChartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="oklch(92% 0.01 264)" />
+                <XAxis dataKey="month" tick={{ fontSize: 10 }} />
+                <YAxis tick={{ fontSize: 10 }} />
                 <Tooltip
-                  contentStyle={{ border: "1px solid #e5e5e5", borderRadius: 0, fontSize: 12 }}
+                  contentStyle={{ borderRadius: 12, border: "1px solid oklch(90% 0.02 264)", fontSize: 12 }}
                 />
-                <Bar dataKey="건수" fill="#1a1a1a" />
-              </BarChart>
+                <Line
+                  type="monotone"
+                  dataKey="건수"
+                  stroke="var(--color-primary)"
+                  strokeWidth={2.5}
+                  dot={{ r: 3, fill: "var(--color-primary)" }}
+                  activeDot={{ r: 5 }}
+                />
+              </LineChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        {/* Department chart */}
-        <div className="border border-border p-6">
-          <h2 className="text-sm font-bold uppercase tracking-widest mb-6">
-            부서별 연차 소진율 (%)
-          </h2>
+        {/* Dept bar chart */}
+        <div className="bg-card rounded-2xl shadow-card p-5">
+          <h3 className="font-semibold text-foreground text-sm mb-4">부서별 연차 소진율 (%)</h3>
           {deptChartData.length > 0 ? (
-            <div className="h-52">
+            <div className="h-48">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={deptChartData} barSize={20} layout="vertical">
-                  <CartesianGrid strokeDasharray="2 2" stroke="#e5e5e5" horizontal={false} />
-                  <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 10, fontFamily: "IBM Plex Mono" }} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fontFamily: "IBM Plex Mono" }} width={60} />
+                <BarChart data={deptChartData} barSize={18} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" stroke="oklch(92% 0.01 264)" horizontal={false} />
+                  <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 10 }} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={56} />
                   <Tooltip
                     formatter={(v: number) => [`${v}%`]}
-                    contentStyle={{ border: "1px solid #e5e5e5", borderRadius: 0, fontSize: 12 }}
+                    contentStyle={{ borderRadius: 12, border: "1px solid oklch(90% 0.02 264)", fontSize: 12 }}
                   />
-                  <Bar dataKey="소진율">
-                    {deptChartData.map((entry, index) => (
-                      <Cell
-                        key={index}
-                        fill={entry.소진율 >= 80 ? "#d4380d" : "#1a1a1a"}
-                      />
+                  <Bar dataKey="소진율" radius={[0, 6, 6, 0]}>
+                    {deptChartData.map((entry, i) => (
+                      <Cell key={i} fill={entry.소진율 >= 80 ? "oklch(55% 0.22 25)" : "var(--color-primary)"} />
                     ))}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
           ) : (
-            <div className="h-52 flex items-center justify-center">
-              <p className="text-sm text-muted-foreground">부서 데이터가 없습니다.</p>
+            <div className="h-48 flex items-center justify-center">
+              <p className="text-sm text-muted-foreground">부서 데이터가 없습니다</p>
             </div>
           )}
         </div>
       </div>
-    </div>
+    </DashboardLayout>
   );
 }

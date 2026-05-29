@@ -1,18 +1,10 @@
+import DashboardLayout from "@/components/DashboardLayout";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { User, Building2, Briefcase, Calendar, Hash } from "lucide-react";
+import { User, Building2, Briefcase, Calendar, Hash, Pencil, X, Save, ShieldCheck } from "lucide-react";
 
-/**
- * Convert a Date object or ISO string returned from the DB to YYYY-MM-DD
- * so it works correctly with <input type="date">.
- *
- * mysql2 returns DATE columns as JavaScript Date objects (UTC midnight).
- * String(date) gives "2020-01-15T00:00:00.000Z" which is NOT valid for
- * <input type="date"> — the browser ignores it and shows an empty field.
- * We must use UTC date parts to avoid timezone-shift bugs.
- */
 function toDateInputValue(val: unknown): string {
   if (!val) return "";
   const d = val instanceof Date ? val : new Date(String(val));
@@ -28,12 +20,7 @@ export default function Profile() {
   const { data: profile, isLoading } = trpc.employee.getMyProfile.useQuery();
   const utils = trpc.useUtils();
 
-  const [form, setForm] = useState({
-    employeeNumber: "",
-    department: "",
-    position: "",
-    entryDate: "",
-  });
+  const [form, setForm] = useState({ employeeNumber: "", department: "", position: "", entryDate: "" });
   const [editing, setEditing] = useState(false);
 
   useEffect(() => {
@@ -67,201 +54,153 @@ export default function Profile() {
     });
   };
 
+  const cancelEdit = () => {
+    setEditing(false);
+    if (profile?.employee) {
+      setForm({
+        employeeNumber: profile.employee.employeeNumber ?? "",
+        department: profile.employee.department ?? "",
+        position: profile.employee.position ?? "",
+        entryDate: toDateInputValue(profile.employee.entryDate),
+      });
+    }
+  };
+
   if (isLoading) {
     return (
-      <div className="p-8 max-w-2xl">
-        <div className="space-y-4">
-          {[1, 2, 3].map((i) => <div key={i} className="h-16 bg-muted animate-pulse" />)}
+      <DashboardLayout>
+        <div className="max-w-xl mx-auto space-y-3">
+          {[1, 2, 3].map((i) => <div key={i} className="h-20 bg-muted rounded-2xl animate-pulse" />)}
         </div>
-      </div>
+      </DashboardLayout>
     );
   }
 
   const hasProfile = !!profile?.employee?.entryDate;
 
   return (
-    <div className="p-8 max-w-2xl animate-fade-in">
-      {/* Header */}
-      <div className="mb-10">
-        <div className="flex items-center gap-3 mb-1">
-          <div className="w-4 h-4 bg-red-accent" />
-          <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground">
-            내 프로필
-          </p>
-        </div>
-        <h1 className="text-4xl font-black tracking-tight">직원 정보</h1>
-        <div className="its-rule mt-4" />
-      </div>
-
-      {/* Auth info (read-only) */}
-      <div className="border border-border p-6 mb-6">
-        <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-4">
-          계정 정보
-        </p>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <p className="text-xs text-muted-foreground mb-1">이름</p>
-            <p className="font-semibold">{user?.name ?? "-"}</p>
+    <DashboardLayout>
+      <div className="max-w-xl mx-auto space-y-4">
+        {/* Account card */}
+        <div className="bg-card rounded-2xl shadow-card overflow-hidden">
+          <div className="px-5 py-4 border-b border-border flex items-center gap-2">
+            <ShieldCheck size={16} style={{ color: "var(--color-primary)" }} />
+            <h3 className="font-semibold text-foreground text-sm">계정 정보</h3>
           </div>
-          <div>
-            <p className="text-xs text-muted-foreground mb-1">이메일</p>
-            <p className="font-semibold font-mono text-sm">{user?.email ?? "-"}</p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground mb-1">역할</p>
-            <span
-              className={`text-[10px] font-mono px-2 py-0.5 uppercase border ${
-                user?.role === "admin"
-                  ? "border-red-accent text-red-accent bg-red-accent-light"
-                  : "border-border text-muted-foreground"
-              }`}
-            >
-              {user?.role === "admin" ? "HR 관리자" : "일반 직원"}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Employee profile */}
-      {!hasProfile && !editing && (
-        <div className="border border-dashed border-border p-8 text-center mb-6">
-          <User className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-          <p className="text-sm font-medium mb-1">직원 정보가 등록되지 않았습니다.</p>
-          <p className="text-xs text-muted-foreground mb-4">
-            입사일을 등록해야 연차가 자동으로 산정됩니다.
-          </p>
-          <button
-            onClick={() => setEditing(true)}
-            className="px-6 py-2 bg-foreground text-background text-sm font-semibold uppercase tracking-widest hover:bg-red-accent transition-colors btn-press"
-          >
-            정보 등록하기
-          </button>
-        </div>
-      )}
-
-      {(hasProfile || editing) && (
-        <form onSubmit={handleSubmit} className="border border-border p-6">
-          <div className="flex items-center justify-between mb-6">
-            <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground">
-              직원 정보
-            </p>
-            {!editing && (
-              <button
-                type="button"
-                onClick={() => setEditing(true)}
-                className="text-xs font-mono uppercase tracking-widest hover:text-red-accent transition-colors"
-              >
-                수정
-              </button>
-            )}
-          </div>
-
-          <div className="space-y-5">
-            <FormField
-              icon={<Hash className="h-4 w-4" />}
-              label="사번"
-              value={form.employeeNumber}
-              onChange={(v) => setForm((f) => ({ ...f, employeeNumber: v }))}
-              placeholder="예: EMP-001"
-              disabled={!editing}
-            />
-            <FormField
-              icon={<Building2 className="h-4 w-4" />}
-              label="부서"
-              value={form.department}
-              onChange={(v) => setForm((f) => ({ ...f, department: v }))}
-              placeholder="예: 개발팀"
-              disabled={!editing}
-            />
-            <FormField
-              icon={<Briefcase className="h-4 w-4" />}
-              label="직급"
-              value={form.position}
-              onChange={(v) => setForm((f) => ({ ...f, position: v }))}
-              placeholder="예: 선임 개발자"
-              disabled={!editing}
-            />
-            <FormField
-              icon={<Calendar className="h-4 w-4" />}
-              label="입사일"
-              value={form.entryDate}
-              onChange={(v) => setForm((f) => ({ ...f, entryDate: v }))}
-              placeholder="YYYY-MM-DD"
-              type="date"
-              disabled={!editing}
-              required
-            />
-          </div>
-
-          {editing && (
-            <div className="flex gap-3 mt-8 pt-6 border-t border-border">
-              <button
-                type="button"
-                onClick={() => {
-                  setEditing(false);
-                  if (profile?.employee) {
-                    setForm({
-                      employeeNumber: profile.employee.employeeNumber ?? "",
-                      department: profile.employee.department ?? "",
-                      position: profile.employee.position ?? "",
-                      entryDate: toDateInputValue(profile.employee.entryDate),
-                    });
-                  }
-                }}
-                className="flex-1 h-11 border border-border text-sm font-semibold uppercase tracking-widest hover:bg-muted transition-colors btn-press"
-              >
-                취소
-              </button>
-              <button
-                type="submit"
-                disabled={update.isPending}
-                className="flex-1 h-11 bg-foreground text-background text-sm font-semibold uppercase tracking-widest hover:bg-red-accent transition-colors btn-press disabled:opacity-40"
-              >
-                {update.isPending ? "저장 중..." : "저장"}
-              </button>
+          <div className="px-5 py-4 grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">이름</p>
+              <p className="font-semibold text-foreground">{user?.name ?? "-"}</p>
             </div>
-          )}
-        </form>
-      )}
-    </div>
-  );
-}
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">이메일</p>
+              <p className="font-medium text-sm text-foreground">{user?.email ?? "-"}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">역할</p>
+              <span
+                className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full"
+                style={
+                  user?.role === "admin"
+                    ? { background: "oklch(93% 0.06 264)", color: "var(--color-primary)" }
+                    : { background: "oklch(93% 0.02 264)", color: "oklch(50% 0.02 264)" }
+                }
+              >
+                {user?.role === "admin" ? "HR 관리자" : "일반 직원"}
+              </span>
+            </div>
+          </div>
+        </div>
 
-function FormField({
-  icon,
-  label,
-  value,
-  onChange,
-  placeholder,
-  type = "text",
-  disabled,
-  required,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-  type?: string;
-  disabled?: boolean;
-  required?: boolean;
-}) {
-  return (
-    <div>
-      <label className="flex items-center gap-2 text-xs font-mono uppercase tracking-widest text-muted-foreground mb-2">
-        {icon}
-        {label}
-        {required && <span className="text-red-accent">*</span>}
-      </label>
-      <input
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        disabled={disabled}
-        required={required}
-        className="w-full h-11 border border-border px-4 text-sm focus:outline-none focus:border-foreground transition-colors disabled:bg-muted disabled:text-muted-foreground font-sans"
-      />
-    </div>
+        {/* Employee profile card */}
+        {!hasProfile && !editing ? (
+          <div className="bg-card rounded-2xl shadow-card p-8 flex flex-col items-center text-center">
+            <div
+              className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
+              style={{ background: "oklch(93% 0.06 264)" }}
+            >
+              <User size={24} style={{ color: "var(--color-primary)" }} />
+            </div>
+            <p className="font-semibold text-foreground mb-1">직원 정보가 없습니다</p>
+            <p className="text-sm text-muted-foreground mb-5">입사일을 등록해야 연차가 자동으로 산정됩니다.</p>
+            <button onClick={() => setEditing(true)} className="btn-primary">
+              정보 등록하기
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="bg-card rounded-2xl shadow-card overflow-hidden">
+            <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <User size={16} style={{ color: "var(--color-primary)" }} />
+                <h3 className="font-semibold text-foreground text-sm">직원 정보</h3>
+              </div>
+              {!editing && (
+                <button type="button" onClick={() => setEditing(true)} className="btn-ghost text-xs">
+                  <Pencil size={13} /> 수정
+                </button>
+              )}
+            </div>
+
+            <div className="px-5 py-4 space-y-4">
+              {[
+                { icon: <Hash size={14} />, label: "사번",   key: "employeeNumber", placeholder: "예: EMP-001" },
+                { icon: <Building2 size={14} />, label: "부서", key: "department",    placeholder: "예: 개발팀" },
+                { icon: <Briefcase size={14} />, label: "직급", key: "position",      placeholder: "예: 선임 개발자" },
+              ].map((f) => (
+                <div key={f.key}>
+                  <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground mb-1.5">
+                    {f.icon} {f.label}
+                  </label>
+                  {editing ? (
+                    <input
+                      type="text"
+                      value={form[f.key as keyof typeof form]}
+                      onChange={(e) => setForm((prev) => ({ ...prev, [f.key]: e.target.value }))}
+                      placeholder={f.placeholder}
+                      className="w-full h-10 px-3 rounded-xl border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
+                    />
+                  ) : (
+                    <p className="text-sm font-medium text-foreground px-1">
+                      {form[f.key as keyof typeof form] || <span className="text-muted-foreground">미등록</span>}
+                    </p>
+                  )}
+                </div>
+              ))}
+
+              <div>
+                <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground mb-1.5">
+                  <Calendar size={14} /> 입사일 <span className="text-destructive">*</span>
+                </label>
+                {editing ? (
+                  <input
+                    type="date"
+                    value={form.entryDate}
+                    onChange={(e) => setForm((prev) => ({ ...prev, entryDate: e.target.value }))}
+                    required
+                    className="w-full h-10 px-3 rounded-xl border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
+                  />
+                ) : (
+                  <p className="text-sm font-medium text-foreground px-1">
+                    {form.entryDate || <span className="text-muted-foreground">미등록</span>}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {editing && (
+              <div className="px-5 py-4 bg-muted/30 border-t border-border flex items-center justify-between">
+                <button type="button" onClick={cancelEdit} className="btn-ghost">
+                  <X size={14} /> 취소
+                </button>
+                <button type="submit" disabled={update.isPending} className="btn-primary disabled:opacity-50">
+                  <Save size={14} />
+                  {update.isPending ? "저장 중…" : "저장"}
+                </button>
+              </div>
+            )}
+          </form>
+        )}
+      </div>
+    </DashboardLayout>
   );
 }

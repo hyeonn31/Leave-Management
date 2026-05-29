@@ -1,9 +1,19 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
-import { CalendarDays, CheckCircle2, Clock, TrendingUp } from "lucide-react";
-import { useLocation } from "wouter";
-import { useMemo, useState } from "react";
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
+import DashboardLayout from "@/components/DashboardLayout";
+import {
+  CalendarCheck,
+  CalendarDays,
+  CalendarX,
+  Clock,
+  TrendingUp,
+  ArrowRight,
+  CheckCircle,
+  XCircle,
+  AlertCircle,
+} from "lucide-react";
+import { useState } from "react";
+import { Link } from "wouter";
 
 const LEAVE_TYPE_LABELS: Record<string, string> = {
   annual: "연차",
@@ -14,238 +24,226 @@ const LEAVE_TYPE_LABELS: Record<string, string> = {
   unpaid: "무급 휴가",
 };
 
-const STATUS_LABELS: Record<string, string> = {
-  pending: "대기",
-  approved: "승인",
-  rejected: "반려",
-};
-
-const STATUS_COLORS: Record<string, string> = {
-  pending: "text-amber-600 bg-amber-50",
-  approved: "text-green-700 bg-green-50",
-  rejected: "text-red-600 bg-red-50",
+const STATUS_CONFIG = {
+  pending:  { label: "대기중",  icon: <AlertCircle size={12} />, cls: "status-pending" },
+  approved: { label: "승인됨",  icon: <CheckCircle size={12} />, cls: "status-approved" },
+  rejected: { label: "반려됨",  icon: <XCircle size={12} />,    cls: "status-rejected" },
 };
 
 export default function Home() {
   const { user } = useAuth();
-  const [, setLocation] = useLocation();
   const currentYear = new Date().getFullYear();
+  const [year] = useState(currentYear);
 
-  const { data: balance, isLoading: balanceLoading } = trpc.leaveBalance.getMyBalance.useQuery({
-    fiscalYear: currentYear,
-  });
-  const { data: recentRequests, isLoading: requestsLoading } = trpc.leaveRequest.myList.useQuery({
-    fiscalYear: currentYear,
-  });
+  const { data: balance, isLoading: balLoading } = trpc.leaveBalance.getMyBalance.useQuery({ fiscalYear: year });
+  const { data: requests, isLoading: reqLoading } = trpc.leaveRequest.myList.useQuery({ fiscalYear: year });
+  const { data: employee } = trpc.employee.getMyProfile.useQuery();
+
+  const recent = (requests ?? []).slice(0, 5);
+  const pending = (requests ?? []).filter((r: any) => r.status === "pending").length;
 
   const totalGranted = Number(balance?.totalGranted ?? 0);
   const used = Number(balance?.used ?? 0);
   const remaining = Number(balance?.remaining ?? 0);
-  const usageRate = totalGranted > 0 ? Math.round((used / totalGranted) * 100) : 0;
-
-  const chartData = [
-    { name: "사용", value: used, color: "#1a1a1a" },
-    { name: "잔여", value: remaining, color: "#e5e5e5" },
-  ];
-
-  const pendingCount = recentRequests?.filter((r) => r.status === "pending").length ?? 0;
+  const usedPct = totalGranted > 0 ? Math.round((used / totalGranted) * 100) : 0;
 
   return (
-    <div className="p-8 max-w-5xl animate-fade-in">
-      {/* Page header */}
-      <div className="mb-10">
-        <div className="flex items-center gap-3 mb-1">
-          <div className="w-4 h-4 bg-red-accent" />
-          <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground">
-            {currentYear}년 연차 현황
-          </p>
+    <DashboardLayout>
+      {/* Welcome */}
+      <div className="mb-6">
+        <h2 className="text-2xl font-bold text-foreground">
+          안녕하세요, {user?.name ?? "사용자"}님! 👋
+        </h2>
+        <p className="text-sm text-muted-foreground mt-1">
+          {year}년 연차 현황을 확인하세요.
+          {employee?.employee?.department && ` · ${employee.employee.department}`}
+          {employee?.employee?.position && ` / ${employee.employee.position}`}
+        </p>
+      </div>
+
+      {/* Stats row */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        {/* Total granted */}
+        <div className="stat-card interactive">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-medium text-muted-foreground">총 부여</span>
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "oklch(93% 0.06 264)" }}>
+              <CalendarDays size={15} style={{ color: "var(--color-primary)" }} />
+            </div>
+          </div>
+          {balLoading ? (
+            <div className="h-8 w-16 bg-muted rounded-lg animate-pulse" />
+          ) : (
+            <p className="text-3xl font-bold text-foreground">{totalGranted}<span className="text-base font-medium text-muted-foreground ml-1">일</span></p>
+          )}
         </div>
-        <h1 className="text-4xl font-black tracking-tight">
-          안녕하세요, {user?.name ?? "직원"}님
-        </h1>
-        <div className="its-rule mt-4" />
+
+        {/* Used */}
+        <div className="stat-card interactive">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-medium text-muted-foreground">사용</span>
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-amber-50">
+              <CalendarCheck size={15} className="text-amber-600" />
+            </div>
+          </div>
+          {balLoading ? (
+            <div className="h-8 w-16 bg-muted rounded-lg animate-pulse" />
+          ) : (
+            <p className="text-3xl font-bold text-foreground">{used}<span className="text-base font-medium text-muted-foreground ml-1">일</span></p>
+          )}
+        </div>
+
+        {/* Remaining */}
+        <div className="stat-card interactive" style={{ background: "var(--color-primary)" }}>
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-medium" style={{ color: "oklch(85% 0.06 264)" }}>잔여</span>
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-white/20">
+              <TrendingUp size={15} className="text-white" />
+            </div>
+          </div>
+          {balLoading ? (
+            <div className="h-8 w-16 bg-white/20 rounded-lg animate-pulse" />
+          ) : (
+            <p className="text-3xl font-bold text-white">{remaining}<span className="text-base font-medium ml-1" style={{ color: "oklch(85% 0.06 264)" }}>일</span></p>
+          )}
+        </div>
+
+        {/* Pending */}
+        <div className="stat-card interactive">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-medium text-muted-foreground">대기중</span>
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-amber-50">
+              <Clock size={15} className="text-amber-600" />
+            </div>
+          </div>
+          <p className="text-3xl font-bold text-foreground">{pending}<span className="text-base font-medium text-muted-foreground ml-1">건</span></p>
+        </div>
       </div>
 
-      {/* Stats grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-0 mb-10 border border-border">
-        <StatCard
-          label="총 부여 연차"
-          value={balanceLoading ? "—" : `${totalGranted}일`}
-          icon={<CalendarDays className="h-5 w-5" />}
-          accent={false}
-        />
-        <StatCard
-          label="사용 연차"
-          value={balanceLoading ? "—" : `${used}일`}
-          icon={<CheckCircle2 className="h-5 w-5" />}
-          accent={false}
-          border
-        />
-        <StatCard
-          label="잔여 연차"
-          value={balanceLoading ? "—" : `${remaining}일`}
-          icon={<TrendingUp className="h-5 w-5" />}
-          accent
-          border
-        />
-      </div>
-
-      {/* Main content: chart + recent requests */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {/* Usage chart */}
-        <div className="border border-border p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-sm font-bold uppercase tracking-widest">연차 소진율</h2>
-            <span className="font-mono text-2xl font-black">{usageRate}%</span>
+      {/* Usage progress + Quick action */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+        {/* Usage bar */}
+        <div className="lg:col-span-2 bg-card rounded-2xl p-5 shadow-card">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-foreground">연차 사용률</h3>
+            <span className="text-sm font-bold" style={{ color: "var(--color-primary)" }}>{usedPct}%</span>
+          </div>
+          <div className="w-full h-3 bg-muted rounded-full overflow-hidden mb-3">
+            <div
+              className="h-full rounded-full transition-all duration-700"
+              style={{
+                width: `${usedPct}%`,
+                background: usedPct > 80
+                  ? "oklch(58% 0.22 27)"
+                  : "var(--color-primary)",
+              }}
+            />
+          </div>
+          <div className="flex justify-between text-xs text-muted-foreground">
+            <span>사용 {used}일</span>
+            <span>총 {totalGranted}일</span>
           </div>
 
-          {totalGranted > 0 ? (
-            <>
-              <div className="h-40">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={chartData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={45}
-                      outerRadius={65}
-                      startAngle={90}
-                      endAngle={-270}
-                      dataKey="value"
-                      strokeWidth={0}
-                    >
-                      {chartData.map((entry, index) => (
-                        <Cell key={index} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      formatter={(v: number) => [`${v}일`]}
-                      contentStyle={{ border: "1px solid #e5e5e5", borderRadius: 0, fontSize: 12 }}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
+          {/* Monthly mini chart */}
+          {!reqLoading && requests && requests.length > 0 && (
+            <div className="mt-5 pt-4 border-t border-border">
+              <p className="text-xs font-medium text-muted-foreground mb-3">월별 사용 현황</p>
+              <div className="flex items-end gap-1.5 h-12">
+                {Array.from({ length: 12 }, (_, i) => {
+                  const monthDays = (requests as any[])
+                    .filter((r) => r.status === "approved" && new Date(r.startDate).getMonth() === i)
+                    .reduce((s: number, r: any) => s + Number(r.totalDays), 0);
+                  const maxDays = 5;
+                  const pct = Math.min((monthDays / maxDays) * 100, 100);
+                  return (
+                    <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                      <div className="w-full rounded-sm" style={{
+                        height: `${Math.max(pct, 4)}%`,
+                        background: monthDays > 0 ? "var(--color-primary)" : "var(--color-muted)",
+                        minHeight: "4px",
+                      }} />
+                      <span className="text-xs text-muted-foreground" style={{ fontSize: "9px" }}>
+                        {i + 1}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
-              <div className="flex gap-6 mt-4">
-                {chartData.map((d) => (
-                  <div key={d.name} className="flex items-center gap-2">
-                    <div className="w-3 h-3" style={{ background: d.color }} />
-                    <span className="text-xs text-muted-foreground font-mono">
-                      {d.name} {d.value}일
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </>
-          ) : (
-            <div className="h-40 flex items-center justify-center">
-              <p className="text-sm text-muted-foreground">
-                입사일을 등록하면 연차가 자동 산정됩니다.
-              </p>
             </div>
           )}
-
-          {/* Progress bar */}
-          <div className="mt-4">
-            <div className="h-1 bg-border w-full">
-              <div
-                className="h-1 bg-foreground transition-all duration-500"
-                style={{ width: `${usageRate}%` }}
-              />
-            </div>
-          </div>
         </div>
 
-        {/* Recent requests */}
-        <div className="border border-border p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-sm font-bold uppercase tracking-widest">최근 신청 내역</h2>
-            {pendingCount > 0 && (
-              <span className="bg-red-accent text-white text-[10px] font-mono px-2 py-0.5">
-                대기 {pendingCount}건
-              </span>
-            )}
+        {/* Quick action card */}
+        <div className="card-blue flex flex-col justify-between">
+          <div>
+            <p className="text-sm font-medium text-white/80 mb-1">연차 신청</p>
+            <p className="text-2xl font-bold text-white mb-2">잔여 {remaining}일</p>
+            <p className="text-xs text-white/70">지금 바로 연차를 신청하세요</p>
           </div>
+          <Link href="/leave/request">
+            <a className="mt-6 flex items-center justify-between bg-white/20 hover:bg-white/30 transition-colors rounded-xl px-4 py-3 text-sm font-semibold text-white">
+              신청하기
+              <ArrowRight size={16} />
+            </a>
+          </Link>
+        </div>
+      </div>
 
-          {requestsLoading ? (
-            <div className="space-y-3">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="h-12 bg-muted animate-pulse" />
-              ))}
-            </div>
-          ) : recentRequests && recentRequests.length > 0 ? (
-            <div className="space-y-0">
-              {recentRequests.slice(0, 5).map((req, i) => (
-                <div
-                  key={req.id}
-                  className={`flex items-center justify-between py-3 ${
-                    i < recentRequests.slice(0, 5).length - 1 ? "border-b border-border" : ""
-                  }`}
-                >
-                  <div>
-                    <p className="text-sm font-medium">
-                      {LEAVE_TYPE_LABELS[req.leaveType] ?? req.leaveType}
+      {/* Recent requests */}
+      <div className="bg-card rounded-2xl shadow-card overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <h3 className="font-semibold text-foreground">최근 연차 신청</h3>
+          <Link href="/leave/history">
+            <a className="text-xs font-medium flex items-center gap-1" style={{ color: "var(--color-primary)" }}>
+              전체 보기 <ArrowRight size={12} />
+            </a>
+          </Link>
+        </div>
+
+        {reqLoading ? (
+          <div className="p-5 space-y-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-12 bg-muted rounded-xl animate-pulse" />
+            ))}
+          </div>
+        ) : recent.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <CalendarX size={32} className="text-muted-foreground mb-3" />
+            <p className="text-sm font-medium text-muted-foreground">연차 신청 내역이 없습니다</p>
+            <Link href="/leave/request">
+              <a className="mt-3 btn-primary text-xs py-1.5 px-3">첫 연차 신청하기</a>
+            </Link>
+          </div>
+        ) : (
+          <div className="divide-y divide-border">
+            {recent.map((r: any) => {
+              const st = STATUS_CONFIG[r.status as keyof typeof STATUS_CONFIG] ?? STATUS_CONFIG.pending;
+              return (
+                <div key={r.id} className="flex items-center gap-4 px-5 py-3.5 hover:bg-muted/40 transition-colors">
+                  <div
+                    className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+                    style={{ background: "oklch(93% 0.06 264)" }}
+                  >
+                    <CalendarDays size={15} style={{ color: "var(--color-primary)" }} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">
+                      {LEAVE_TYPE_LABELS[r.leaveType] ?? r.leaveType}
                     </p>
-                    <p className="text-xs text-muted-foreground font-mono mt-0.5">
-                      {String(req.startDate)} ~ {String(req.endDate)}
+                    <p className="text-xs text-muted-foreground">
+                      {r.startDate?.slice(0, 10)} ~ {r.endDate?.slice(0, 10)} · {r.totalDays}일
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono text-muted-foreground">
-                      {Number(req.totalDays)}일
-                    </span>
-                    <span
-                      className={`text-[10px] font-mono px-2 py-0.5 uppercase ${STATUS_COLORS[req.status]}`}
-                    >
-                      {STATUS_LABELS[req.status]}
-                    </span>
-                  </div>
+                  <span className={st.cls}>
+                    {st.icon}
+                    {st.label}
+                  </span>
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center h-32 text-center">
-              <Clock className="h-8 w-8 text-muted-foreground mb-2" />
-              <p className="text-sm text-muted-foreground">신청 내역이 없습니다.</p>
-            </div>
-          )}
-
-          <button
-            onClick={() => setLocation("/leave/request")}
-            className="mt-6 w-full h-10 border border-foreground text-sm font-semibold uppercase tracking-widest hover:bg-foreground hover:text-background transition-colors btn-press"
-          >
-            연차 신청하기
-          </button>
-        </div>
+              );
+            })}
+          </div>
+        )}
       </div>
-    </div>
-  );
-}
-
-function StatCard({
-  label,
-  value,
-  icon,
-  accent,
-  border,
-}: {
-  label: string;
-  value: string;
-  icon: React.ReactNode;
-  accent?: boolean;
-  border?: boolean;
-}) {
-  return (
-    <div
-      className={`p-6 ${border ? "border-l border-border" : ""} ${
-        accent ? "bg-foreground text-background" : "bg-background"
-      }`}
-    >
-      <div className={`mb-4 ${accent ? "text-white/60" : "text-muted-foreground"}`}>{icon}</div>
-      <p className={`text-3xl font-black font-mono mb-1`}>{value}</p>
-      <p className={`text-xs uppercase tracking-widest font-medium ${accent ? "text-white/70" : "text-muted-foreground"}`}>
-        {label}
-      </p>
-    </div>
+    </DashboardLayout>
   );
 }

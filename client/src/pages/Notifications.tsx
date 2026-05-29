@@ -1,26 +1,13 @@
+import DashboardLayout from "@/components/DashboardLayout";
 import { trpc } from "@/lib/trpc";
-import { Bell, BellOff, CheckCheck } from "lucide-react";
+import { Bell, BellOff, CheckCheck, CalendarCheck, CalendarX, Calendar, Gift } from "lucide-react";
 import { toast } from "sonner";
 
-const TYPE_LABELS: Record<string, string> = {
-  leave_request_submitted: "연차 신청 접수",
-  leave_approved: "연차 승인",
-  leave_rejected: "연차 반려",
-  leave_renewal: "연차 갱신",
-};
-
-const TYPE_COLORS: Record<string, string> = {
-  leave_request_submitted: "bg-blue-50 border-blue-200",
-  leave_approved: "bg-green-50 border-green-200",
-  leave_rejected: "bg-red-50 border-red-200",
-  leave_renewal: "bg-amber-50 border-amber-200",
-};
-
-const TYPE_ACCENT: Record<string, string> = {
-  leave_request_submitted: "bg-blue-500",
-  leave_approved: "bg-green-500",
-  leave_rejected: "bg-red-accent",
-  leave_renewal: "bg-amber-500",
+const TYPE_CONFIG: Record<string, { label: string; icon: React.ReactNode; color: string; bg: string }> = {
+  leave_request_submitted: { label: "연차 신청",  icon: <Calendar size={14} />,      color: "var(--color-primary)", bg: "oklch(93% 0.06 264)" },
+  leave_approved:          { label: "연차 승인",  icon: <CalendarCheck size={14} />,  color: "oklch(55% 0.18 145)", bg: "oklch(93% 0.06 145)" },
+  leave_rejected:          { label: "연차 반려",  icon: <CalendarX size={14} />,      color: "oklch(55% 0.22 25)",  bg: "oklch(95% 0.04 25)" },
+  leave_renewal:           { label: "연차 갱신",  icon: <Gift size={14} />,           color: "oklch(60% 0.18 85)",  bg: "oklch(95% 0.04 85)" },
 };
 
 export default function Notifications() {
@@ -33,7 +20,6 @@ export default function Notifications() {
       utils.notification.unreadCount.invalidate();
     },
   });
-
   const markAllRead = trpc.notification.markAllRead.useMutation({
     onSuccess: () => {
       toast.success("모든 알림을 읽음 처리했습니다.");
@@ -45,83 +31,88 @@ export default function Notifications() {
   const unreadCount = notifications?.filter((n) => !n.isRead).length ?? 0;
 
   return (
-    <div className="p-8 max-w-3xl animate-fade-in">
-      {/* Header */}
-      <div className="mb-10">
-        <div className="flex items-center gap-3 mb-1">
-          <div className="w-4 h-4 bg-red-accent" />
-          <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground">알림</p>
-        </div>
-        <div className="flex items-end justify-between">
-          <div>
-            <h1 className="text-4xl font-black tracking-tight">알림 센터</h1>
-            {unreadCount > 0 && (
-              <p className="text-sm text-muted-foreground mt-1">
-                읽지 않은 알림{" "}
-                <span className="font-mono font-bold text-red-accent">{unreadCount}건</span>
-              </p>
-            )}
-          </div>
-          {unreadCount > 0 && (
-            <button
-              onClick={() => markAllRead.mutate()}
-              disabled={markAllRead.isPending}
-              className="flex items-center gap-2 px-4 py-2 border border-border text-sm hover:bg-muted transition-colors btn-press"
-            >
-              <CheckCheck className="h-4 w-4" />
-              모두 읽음
-            </button>
+    <DashboardLayout>
+      {/* Action bar */}
+      <div className="flex items-center justify-between mb-6">
+        <p className="text-sm text-muted-foreground">
+          {unreadCount > 0 ? (
+            <>읽지 않은 알림 <span className="font-semibold text-primary">{unreadCount}건</span></>
+          ) : (
+            "모든 알림을 확인했습니다"
           )}
-        </div>
-        <div className="its-rule mt-4" />
+        </p>
+        {unreadCount > 0 && (
+          <button
+            onClick={() => markAllRead.mutate()}
+            disabled={markAllRead.isPending}
+            className="btn-ghost"
+          >
+            <CheckCheck size={14} />
+            모두 읽음
+          </button>
+        )}
       </div>
 
-      {isLoading ? (
-        <div className="space-y-2">
-          {[1, 2, 3].map((i) => <div key={i} className="h-20 bg-muted animate-pulse" />)}
-        </div>
-      ) : notifications && notifications.length > 0 ? (
-        <div className="space-y-0 border border-border">
-          {notifications.map((n, i) => (
-            <div
-              key={n.id}
-              onClick={() => {
-                if (!n.isRead) markRead.mutate({ id: n.id });
-              }}
-              className={`flex gap-4 p-4 cursor-pointer transition-colors ${
-                !n.isRead ? "bg-muted/30" : ""
-              } ${i < notifications.length - 1 ? "border-b border-border" : ""} hover:bg-muted/50`}
-            >
-              {/* Accent dot */}
-              <div className="flex-shrink-0 mt-1">
-                <div className={`w-2 h-2 mt-1 ${!n.isRead ? TYPE_ACCENT[n.type] ?? "bg-foreground" : "bg-border"}`} />
-              </div>
+      {/* List */}
+      <div className="bg-card rounded-2xl shadow-card overflow-hidden">
+        {isLoading ? (
+          <div className="p-5 space-y-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-16 bg-muted rounded-xl animate-pulse" />
+            ))}
+          </div>
+        ) : (notifications ?? []).length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <BellOff size={36} className="text-muted-foreground mb-3" />
+            <p className="text-sm font-medium text-muted-foreground">알림이 없습니다</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-border">
+            {(notifications ?? []).map((n) => {
+              const cfg = TYPE_CONFIG[n.type] ?? {
+                label: n.type,
+                icon: <Bell size={14} />,
+                color: "var(--color-primary)",
+                bg: "oklch(93% 0.06 264)",
+              };
+              return (
+                <div
+                  key={n.id}
+                  onClick={() => { if (!n.isRead) markRead.mutate({ id: n.id }); }}
+                  className={`flex items-start gap-4 px-5 py-4 cursor-pointer transition-colors hover:bg-muted/30 ${!n.isRead ? "bg-secondary/40" : ""}`}
+                >
+                  <div
+                    className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 mt-0.5"
+                    style={{ background: cfg.bg, color: cfg.color }}
+                  >
+                    {cfg.icon}
+                  </div>
 
-              <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <span className={`text-[10px] font-mono uppercase tracking-widest px-1.5 py-0.5 border ${TYPE_COLORS[n.type] ?? ""}`}>
-                      {TYPE_LABELS[n.type] ?? n.type}
-                    </span>
-                    <p className={`text-sm font-semibold mt-1.5 ${!n.isRead ? "" : "text-muted-foreground"}`}>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span
+                        className="text-xs font-medium px-2 py-0.5 rounded-full"
+                        style={{ background: cfg.bg, color: cfg.color }}
+                      >
+                        {cfg.label}
+                      </span>
+                      {!n.isRead && <span className="w-1.5 h-1.5 rounded-full bg-primary" />}
+                    </div>
+                    <p className={`text-sm font-semibold ${!n.isRead ? "text-foreground" : "text-muted-foreground"}`}>
                       {n.title}
                     </p>
+                    <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{n.message}</p>
                   </div>
-                  <p className="text-[10px] font-mono text-muted-foreground whitespace-nowrap">
+
+                  <p className="text-xs text-muted-foreground whitespace-nowrap shrink-0 mt-1">
                     {new Date(n.createdAt).toLocaleDateString("ko-KR")}
                   </p>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{n.message}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="border border-border p-16 text-center">
-          <BellOff className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-          <p className="text-sm text-muted-foreground">알림이 없습니다.</p>
-        </div>
-      )}
-    </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </DashboardLayout>
   );
 }

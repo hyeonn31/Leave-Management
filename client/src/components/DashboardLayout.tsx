@@ -1,313 +1,364 @@
 import { useAuth } from "@/_core/hooks/useAuth";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarFooter,
-  SidebarHeader,
-  SidebarInset,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarProvider,
-  SidebarTrigger,
-  useSidebar,
-} from "@/components/ui/sidebar";
 import { getLoginUrl } from "@/const";
-import { useIsMobile } from "@/hooks/useMobile";
+import { trpc } from "@/lib/trpc";
 import {
   BarChart3,
   Bell,
+  CalendarCheck,
   CalendarDays,
-  ChevronRight,
+  ChevronDown,
   ClipboardList,
-  LayoutDashboard,
-  LogOut,
-  PanelLeft,
-  Settings,
-  User,
-  Users,
   Gift,
+  Home,
+  LogOut,
+  Settings,
+  Shield,
+  Users,
+  X,
 } from "lucide-react";
-import { CSSProperties, useEffect, useRef, useState } from "react";
-import { useLocation } from "wouter";
-import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
-import { Button } from "./ui/button";
-import { trpc } from "@/lib/trpc";
+import { useEffect, useRef, useState } from "react";
+import { Link, useLocation } from "wouter";
 
-const employeeMenuItems = [
-  { icon: LayoutDashboard, label: "대시보드", path: "/" },
-  { icon: CalendarDays, label: "연차 신청", path: "/leave/request" },
-  { icon: ClipboardList, label: "내 연차 내역", path: "/leave/history" },
-  { icon: Bell, label: "알림", path: "/notifications" },
-  { icon: User, label: "내 프로필", path: "/profile" },
+/* ─── Types ────────────────────────────────────────────────────────────────── */
+interface NavItem {
+  label: string;
+  href: string;
+  icon: React.ReactNode;
+  adminOnly?: boolean;
+}
+
+const NAV_ITEMS: NavItem[] = [
+  { label: "대시보드", href: "/", icon: <Home size={16} /> },
+  { label: "연차 신청", href: "/leave/request", icon: <CalendarDays size={16} /> },
+  { label: "연차 이력", href: "/leave/history", icon: <CalendarCheck size={16} /> },
+  { label: "알림", href: "/notifications", icon: <Bell size={16} /> },
+  { label: "내 프로필", href: "/profile", icon: <Settings size={16} /> },
 ];
 
-const adminMenuItems = [
-  { icon: LayoutDashboard, label: "관리자 대시보드", path: "/admin" },
-  { icon: ClipboardList, label: "연차 신청 관리", path: "/admin/requests" },
-  { icon: Users, label: "직원 관리", path: "/admin/employees" },
-  { icon: CalendarDays, label: "직원별 연차 현황", path: "/admin/leave-overview" },
-  { icon: Gift, label: "특별 연차 부여", path: "/admin/special-leave" },
-  { icon: BarChart3, label: "통계 & 내보내기", path: "/admin/stats" },
+const ADMIN_NAV_ITEMS: NavItem[] = [
+  { label: "관리자 대시보드", href: "/admin", icon: <BarChart3 size={16} />, adminOnly: true },
+  { label: "연차 신청 관리", href: "/admin/requests", icon: <ClipboardList size={16} />, adminOnly: true },
+  { label: "직원 현황", href: "/admin/leave-overview", icon: <CalendarCheck size={16} />, adminOnly: true },
+  { label: "특별 연차 부여", href: "/admin/special-leave", icon: <Gift size={16} />, adminOnly: true },
+  { label: "직원 관리", href: "/admin/employees", icon: <Users size={16} />, adminOnly: true },
+  { label: "통계 & 내보내기", href: "/admin/stats", icon: <BarChart3 size={16} />, adminOnly: true },
 ];
 
-const SIDEBAR_WIDTH_KEY = "sidebar-width";
-const DEFAULT_WIDTH = 240;
-const MIN_WIDTH = 200;
-const MAX_WIDTH = 360;
-
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const [sidebarWidth, setSidebarWidth] = useState(() => {
-    const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY);
-    return saved ? parseInt(saved, 10) : DEFAULT_WIDTH;
+/* ─── Sidebar ──────────────────────────────────────────────────────────────── */
+function Sidebar({
+  user,
+  isAdmin,
+  unreadCount,
+  onClose,
+}: {
+  user: { name?: string | null; email?: string | null };
+  isAdmin: boolean;
+  unreadCount: number;
+  onClose?: () => void;
+}) {
+  const [location] = useLocation();
+  const logout = trpc.auth.logout.useMutation({
+    onSuccess: () => (window.location.href = "/"),
   });
-  const { loading, user } = useAuth();
 
-  useEffect(() => {
-    localStorage.setItem(SIDEBAR_WIDTH_KEY, sidebarWidth.toString());
-  }, [sidebarWidth]);
+  const isActive = (href: string) =>
+    href === "/" ? location === "/" : location.startsWith(href);
 
-  if (loading) return <DashboardLayoutSkeleton />;
-
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="max-w-sm w-full px-8">
-          {/* ITS: big red square accent */}
-          <div className="w-12 h-12 bg-red-accent mb-8" />
-          <h1 className="text-3xl font-black tracking-tight mb-2">연차 관리 시스템</h1>
-          <p className="text-sm text-muted-foreground mb-8 leading-relaxed">
-            HR 업무 전반을 하나의 플랫폼에서 처리하세요.
-            <br />
-            로그인이 필요합니다.
-          </p>
-          <div className="its-rule mb-8" />
-          <Button
-            onClick={() => { window.location.href = getLoginUrl(); }}
-            className="w-full h-12 text-sm font-semibold tracking-widest uppercase btn-press"
+  return (
+    <aside
+      className="flex flex-col h-full w-64 shrink-0"
+      style={{ background: "var(--color-sidebar)" }}
+    >
+      {/* Logo */}
+      <div className="flex items-center justify-between px-5 py-5 border-b border-sidebar-border">
+        <div className="flex items-center gap-2.5">
+          <div
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-sm"
+            style={{ background: "var(--color-primary)" }}
           >
-            로그인
-          </Button>
+            HR
+          </div>
+          <span className="font-bold text-base" style={{ color: "var(--color-sidebar-foreground)" }}>
+            연차 관리
+          </span>
+        </div>
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="lg:hidden p-1 rounded-lg hover:bg-sidebar-accent text-sidebar-muted"
+          >
+            <X size={16} />
+          </button>
+        )}
+      </div>
+
+      {/* User card */}
+      <div className="px-4 py-4 border-b border-sidebar-border">
+        <div className="flex items-center gap-3">
+          <div
+            className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-semibold shrink-0"
+            style={{ background: "var(--color-primary)" }}
+          >
+            {user.name?.charAt(0)?.toUpperCase() ?? "U"}
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold truncate" style={{ color: "var(--color-sidebar-foreground)" }}>
+              {user.name ?? "사용자"}
+            </p>
+            <p className="text-xs truncate" style={{ color: "var(--color-sidebar-muted)" }}>
+              {user.email ?? ""}
+            </p>
+          </div>
+          {isAdmin && (
+            <span
+              className="ml-auto shrink-0 px-1.5 py-0.5 rounded text-xs font-medium"
+              style={{ background: "var(--color-primary)", color: "#fff" }}
+            >
+              관리자
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Nav */}
+      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
+        <p className="px-3 pb-2 text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--color-sidebar-muted)" }}>
+          메뉴
+        </p>
+        {NAV_ITEMS.map((item) => (
+          <Link key={item.href} href={item.href} onClick={onClose}>
+            <a
+              className={`nav-item ${isActive(item.href) ? "active" : ""}`}
+            >
+              {item.icon}
+              <span>{item.label}</span>
+              {item.href === "/notifications" && unreadCount > 0 && (
+                <span
+                  className="ml-auto w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold"
+                  style={{ background: "var(--color-primary)", color: "#fff" }}
+                >
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              )}
+            </a>
+          </Link>
+        ))}
+
+        {isAdmin && (
+          <>
+            <p className="px-3 pt-4 pb-2 text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--color-sidebar-muted)" }}>
+              관리자
+            </p>
+            {ADMIN_NAV_ITEMS.map((item) => (
+              <Link key={item.href} href={item.href} onClick={onClose}>
+                <a
+                  className={`nav-item ${isActive(item.href) ? "active" : ""}`}
+                >
+                  <Shield size={14} className="shrink-0 opacity-60" />
+                  <span>{item.label}</span>
+                </a>
+              </Link>
+            ))}
+          </>
+        )}
+      </nav>
+
+      {/* Logout */}
+      <div className="px-3 py-4 border-t border-sidebar-border">
+        <button
+          onClick={() => logout.mutate()}
+          className="nav-item w-full text-left"
+          disabled={logout.isPending}
+        >
+          <LogOut size={16} />
+          <span>{logout.isPending ? "로그아웃 중…" : "로그아웃"}</span>
+        </button>
+      </div>
+    </aside>
+  );
+}
+
+/* ─── Header ───────────────────────────────────────────────────────────────── */
+function Header({
+  title,
+  subtitle,
+  unreadCount,
+  onMenuToggle,
+}: {
+  title: string;
+  subtitle?: string;
+  unreadCount: number;
+  onMenuToggle: () => void;
+}) {
+  return (
+    <header className="flex items-center justify-between px-6 py-4 bg-card border-b border-border shrink-0">
+      {/* Mobile menu toggle */}
+      <button
+        className="lg:hidden p-2 rounded-xl hover:bg-muted mr-3"
+        onClick={onMenuToggle}
+      >
+        <div className="w-5 h-0.5 bg-foreground mb-1 rounded" />
+        <div className="w-5 h-0.5 bg-foreground mb-1 rounded" />
+        <div className="w-5 h-0.5 bg-foreground rounded" />
+      </button>
+
+      <div>
+        <h1 className="text-lg font-bold text-foreground">{title}</h1>
+        {subtitle && <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>}
+      </div>
+
+      <div className="flex items-center gap-2 ml-auto">
+        <Link href="/notifications">
+          <a className="relative p-2 rounded-xl hover:bg-muted transition-colors">
+            <Bell size={18} className="text-muted-foreground" />
+            {unreadCount > 0 && (
+              <span
+                className="absolute top-1 right-1 w-4 h-4 rounded-full flex items-center justify-center text-xs font-bold text-white"
+                style={{ background: "var(--color-primary)", fontSize: "9px" }}
+              >
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            )}
+          </a>
+        </Link>
+      </div>
+    </header>
+  );
+}
+
+/* ─── Page title map ───────────────────────────────────────────────────────── */
+const PAGE_TITLES: Record<string, { title: string; subtitle: string }> = {
+  "/": { title: "대시보드", subtitle: "연차 현황을 한눈에 확인하세요" },
+  "/leave/request": { title: "연차 신청", subtitle: "새 연차를 신청하세요" },
+  "/leave/history": { title: "연차 이력", subtitle: "연도별 연차 사용 내역" },
+  "/notifications": { title: "알림", subtitle: "최근 알림 목록" },
+  "/profile": { title: "내 프로필", subtitle: "프로필 및 직원 정보 관리" },
+  "/admin": { title: "관리자 대시보드", subtitle: "전직원 연차 현황 요약" },
+  "/admin/requests": { title: "연차 신청 관리", subtitle: "신청 승인 및 반려 처리" },
+  "/admin/leave-overview": { title: "직원 연차 현황", subtitle: "직원별 잔여·사용 이력 조회" },
+  "/admin/special-leave": { title: "특별 연차 부여", subtitle: "주말 출근자 보상 연차 부여" },
+  "/admin/employees": { title: "직원 관리", subtitle: "직원 정보 및 입사일 관리" },
+  "/admin/stats": { title: "통계 & 내보내기", subtitle: "연차 통계 및 CSV 내보내기" },
+};
+
+/* ─── Main Layout ──────────────────────────────────────────────────────────── */
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const { user, loading, isAuthenticated } = useAuth();
+  const [location] = useLocation();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const overlayRef = useRef<HTMLDivElement>(null);
+
+  const isAdmin = user?.role === "admin";
+
+  const { data: notifData } = trpc.notification.list.useQuery(
+    undefined,
+    { enabled: isAuthenticated, refetchInterval: 30000 }
+  );
+  const unreadCount = notifData?.filter((n: any) => !n.isRead).length ?? 0;
+
+  // Close sidebar on route change
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [location]);
+
+  const pageInfo = PAGE_TITLES[location] ?? { title: "연차 관리", subtitle: "" };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4">
+          <div
+            className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold"
+            style={{ background: "var(--color-primary)" }}
+          >
+            HR
+          </div>
+          <div className="flex gap-1">
+            {[0, 1, 2].map((i) => (
+              <div
+                key={i}
+                className="w-2 h-2 rounded-full animate-bounce"
+                style={{
+                  background: "var(--color-primary)",
+                  animationDelay: `${i * 120}ms`,
+                }}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background px-4">
+        <div className="w-full max-w-sm">
+          <div className="bg-card rounded-3xl p-8 shadow-card text-center">
+            <div
+              className="w-14 h-14 rounded-2xl flex items-center justify-center text-white font-bold text-xl mx-auto mb-6"
+              style={{ background: "var(--color-primary)" }}
+            >
+              HR
+            </div>
+            <h1 className="text-2xl font-bold text-foreground mb-1">연차 관리 시스템</h1>
+            <p className="text-sm text-muted-foreground mb-8">HR 업무 전반을 하나의 플랫폼에서 처리하세요.</p>
+            <a
+              href={getLoginUrl()}
+              className="btn-primary w-full justify-center py-3 text-base"
+              style={{ display: "flex" }}
+            >
+              로그인
+            </a>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <SidebarProvider style={{ "--sidebar-width": `${sidebarWidth}px` } as CSSProperties}>
-      <DashboardLayoutContent setSidebarWidth={setSidebarWidth}>
-        {children}
-      </DashboardLayoutContent>
-    </SidebarProvider>
-  );
-}
-
-function DashboardLayoutContent({
-  children,
-  setSidebarWidth,
-}: {
-  children: React.ReactNode;
-  setSidebarWidth: (w: number) => void;
-}) {
-  const { user, logout } = useAuth();
-  const [location, setLocation] = useLocation();
-  const { state, toggleSidebar } = useSidebar();
-  const isCollapsed = state === "collapsed";
-  const [isResizing, setIsResizing] = useState(false);
-  const sidebarRef = useRef<HTMLDivElement>(null);
-  const isMobile = useIsMobile();
-  const isAdmin = user?.role === "admin";
-
-  const { data: unreadCount } = trpc.notification.unreadCount.useQuery(undefined, {
-    refetchInterval: 30000,
-  });
-
-  const menuItems = isAdmin
-    ? [...employeeMenuItems, ...adminMenuItems]
-    : employeeMenuItems;
-
-  useEffect(() => {
-    if (isCollapsed) setIsResizing(false);
-  }, [isCollapsed]);
-
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isResizing) return;
-      const sidebarLeft = sidebarRef.current?.getBoundingClientRect().left ?? 0;
-      const newWidth = e.clientX - sidebarLeft;
-      if (newWidth >= MIN_WIDTH && newWidth <= MAX_WIDTH) setSidebarWidth(newWidth);
-    };
-    const handleMouseUp = () => setIsResizing(false);
-    if (isResizing) {
-      document.addEventListener("mousemove", handleMouseMove);
-      document.addEventListener("mouseup", handleMouseUp);
-      document.body.style.cursor = "col-resize";
-      document.body.style.userSelect = "none";
-    }
-    return () => {
-      document.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("mouseup", handleMouseUp);
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
-    };
-  }, [isResizing, setSidebarWidth]);
-
-  return (
-    <>
-      <div className="relative" ref={sidebarRef}>
-        <Sidebar collapsible="icon" className="border-r border-border bg-sidebar" disableTransition={isResizing}>
-          {/* Header */}
-          <SidebarHeader className="h-14 border-b border-border px-3 flex-row items-center gap-2">
-            <button
-              onClick={toggleSidebar}
-              className="h-8 w-8 flex items-center justify-center hover:bg-accent transition-colors focus:outline-none shrink-0"
-              aria-label="Toggle navigation"
-            >
-              <PanelLeft className="h-4 w-4" />
-            </button>
-            {!isCollapsed && (
-              <div className="flex items-center gap-2 min-w-0 animate-fade-in">
-                <div className="w-3 h-3 bg-red-accent shrink-0" />
-                <span className="font-black text-sm tracking-widest uppercase truncate">
-                  연차 관리
-                </span>
-              </div>
-            )}
-          </SidebarHeader>
-
-          {/* Navigation */}
-          <SidebarContent className="gap-0 pt-2">
-            {/* Employee section */}
-            {!isCollapsed && (
-              <p className="px-4 py-2 text-[10px] font-mono font-medium uppercase tracking-widest text-muted-foreground">
-                직원
-              </p>
-            )}
-            <SidebarMenu className="px-2">
-              {employeeMenuItems.map((item) => {
-                const isActive = location === item.path;
-                return (
-                  <SidebarMenuItem key={item.path}>
-                    <SidebarMenuButton
-                      isActive={isActive}
-                      onClick={() => setLocation(item.path)}
-                      tooltip={item.label}
-                      className={`h-9 transition-colors font-normal relative ${
-                        isActive
-                          ? "bg-foreground text-background font-medium"
-                          : "hover:bg-accent"
-                      }`}
-                    >
-                      <item.icon className="h-4 w-4 shrink-0" />
-                      <span className="truncate">{item.label}</span>
-                      {item.path === "/notifications" && (unreadCount ?? 0) > 0 && (
-                        <span className="ml-auto bg-red-accent text-white text-[10px] font-mono px-1.5 py-0.5 min-w-[18px] text-center">
-                          {unreadCount}
-                        </span>
-                      )}
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
-            </SidebarMenu>
-
-            {/* Admin section */}
-            {isAdmin && (
-              <>
-                {!isCollapsed && (
-                  <p className="px-4 py-2 mt-2 text-[10px] font-mono font-medium uppercase tracking-widest text-red-accent">
-                    관리자
-                  </p>
-                )}
-                <SidebarMenu className="px-2">
-                  {adminMenuItems.map((item) => {
-                    const isActive = location === item.path;
-                    return (
-                      <SidebarMenuItem key={item.path}>
-                        <SidebarMenuButton
-                          isActive={isActive}
-                          onClick={() => setLocation(item.path)}
-                          tooltip={item.label}
-                          className={`h-9 transition-colors font-normal ${
-                            isActive
-                              ? "bg-red-accent text-white font-medium"
-                              : "hover:bg-red-accent-light hover:text-red-accent"
-                          }`}
-                        >
-                          <item.icon className="h-4 w-4 shrink-0" />
-                          <span className="truncate">{item.label}</span>
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
-                    );
-                  })}
-                </SidebarMenu>
-              </>
-            )}
-          </SidebarContent>
-
-          {/* Footer */}
-          <SidebarFooter className="p-3 border-t border-border">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-3 px-2 py-2 hover:bg-accent transition-colors w-full text-left focus:outline-none group-data-[collapsible=icon]:justify-center">
-                  <Avatar className="h-8 w-8 border border-border shrink-0">
-                    <AvatarFallback className="text-xs font-bold bg-foreground text-background">
-                      {user?.name?.charAt(0).toUpperCase() ?? "U"}
-                    </AvatarFallback>
-                  </Avatar>
-                  {!isCollapsed && (
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold truncate leading-none">{user?.name || "-"}</p>
-                      <p className="text-[10px] text-muted-foreground truncate mt-1 font-mono">
-                        {isAdmin ? "관리자" : "직원"}
-                      </p>
-                    </div>
-                  )}
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem onClick={() => setLocation("/profile")} className="cursor-pointer">
-                  <User className="mr-2 h-4 w-4" />
-                  <span>내 프로필</span>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={logout} className="cursor-pointer text-destructive focus:text-destructive">
-                  <LogOut className="mr-2 h-4 w-4" />
-                  <span>로그아웃</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </SidebarFooter>
-        </Sidebar>
-
-        {/* Resize handle */}
+    <div className="flex h-screen bg-background overflow-hidden">
+      {/* Mobile overlay */}
+      {sidebarOpen && (
         <div
-          className={`absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-foreground/20 transition-colors ${isCollapsed ? "hidden" : ""}`}
-          onMouseDown={() => { if (!isCollapsed) setIsResizing(true); }}
-          style={{ zIndex: 50 }}
+          ref={overlayRef}
+          className="fixed inset-0 z-40 bg-black/40 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar — desktop always visible, mobile slide-in */}
+      <div
+        className={`
+          fixed lg:relative inset-y-0 left-0 z-50 lg:z-auto
+          transform transition-transform duration-250 ease-out
+          ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
+        `}
+        style={{ transitionTimingFunction: "var(--ease-out)" }}
+      >
+        <Sidebar
+          user={user!}
+          isAdmin={isAdmin}
+          unreadCount={unreadCount}
+          onClose={() => setSidebarOpen(false)}
         />
       </div>
 
-      <SidebarInset>
-        {isMobile && (
-          <div className="flex border-b h-14 items-center justify-between bg-background px-4 sticky top-0 z-40">
-            <div className="flex items-center gap-3">
-              <SidebarTrigger className="h-8 w-8" />
-              <div className="w-2 h-2 bg-red-accent" />
-              <span className="font-black text-sm tracking-widest uppercase">연차 관리</span>
-            </div>
+      {/* Main content */}
+      <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+        <Header
+          title={pageInfo.title}
+          subtitle={pageInfo.subtitle}
+          unreadCount={unreadCount}
+          onMenuToggle={() => setSidebarOpen(true)}
+        />
+
+        <main className="flex-1 overflow-y-auto">
+          <div className="p-6 animate-in">
+            {children}
           </div>
-        )}
-        <main className="flex-1 min-h-screen">{children}</main>
-      </SidebarInset>
-    </>
+        </main>
+      </div>
+    </div>
   );
 }
