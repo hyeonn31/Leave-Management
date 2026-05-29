@@ -15,7 +15,9 @@ import Profile from "./pages/Profile";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminRequests from "./pages/AdminRequests";
 import AdminEmployees from "./pages/AdminEmployees";
-import AdminStats from "./pages/AdminStats";
+import AdminStats from "@/pages/AdminStats";
+import AdminLeaveOverview from "@/pages/AdminLeaveOverview";
+import AdminSpecialLeave from "@/pages/AdminSpecialLeave";
 
 function Router() {
   return (
@@ -30,6 +32,8 @@ function Router() {
         <Route path="/admin/requests" component={AdminRequests} />
         <Route path="/admin/employees" component={AdminEmployees} />
         <Route path="/admin/stats" component={AdminStats} />
+        <Route path="/admin/leave-overview" component={AdminLeaveOverview} />
+        <Route path="/admin/special-leave" component={AdminSpecialLeave} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
       </Switch>

@@ -34,6 +34,7 @@ import {
   Settings,
   User,
   Users,
+  Gift,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -53,6 +54,8 @@ const adminMenuItems = [
   { icon: LayoutDashboard, label: "관리자 대시보드", path: "/admin" },
   { icon: ClipboardList, label: "연차 신청 관리", path: "/admin/requests" },
   { icon: Users, label: "직원 관리", path: "/admin/employees" },
+  { icon: CalendarDays, label: "직원별 연차 현황", path: "/admin/leave-overview" },
+  { icon: Gift, label: "특별 연차 부여", path: "/admin/special-leave" },
   { icon: BarChart3, label: "통계 & 내보내기", path: "/admin/stats" },
 ];
 

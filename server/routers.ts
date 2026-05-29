@@ -467,6 +467,106 @@ const adminRouter = router({
       };
     }),
 
+  // Admin: per-employee leave overview (balance + history)
+  // Shows ALL employees, even those without a leave_balance row for the year
+  leaveOverview: adminProcedure
+    .input(z.object({ fiscalYear: z.number() }))
+    .query(async ({ input }) => {
+      const [allEmployees, allBalances, allRequests] = await Promise.all([
+        getAllEmployeesWithUsers(),
+        getAllLeaveBalancesForYear(input.fiscalYear),
+        getAllLeaveRequestsForExport(input.fiscalYear),
+      ]);
+      // Map userId -> balance
+      const balanceByUser = new Map(allBalances.map((b) => [b.user.id, b]));
+      // Map userId -> requests
+      const requestsByUser = new Map<number, typeof allRequests>();
+      for (const r of allRequests) {
+        const uid = r.user.id;
+        if (!requestsByUser.has(uid)) requestsByUser.set(uid, []);
+        requestsByUser.get(uid)!.push(r);
+      }
+      return allEmployees.map(({ user, employee }) => {
+        const b = balanceByUser.get(user.id);
+        return {
+          user,
+          employee: employee ?? null,
+          balance: b
+            ? b.balance
+            : { totalGranted: '0', used: '0', remaining: '0', fiscalYear: input.fiscalYear },
+          requests: requestsByUser.get(user.id) ?? [],
+        };
+      });
+    }),
+
+  // Admin: grant special leave (e.g. weekend work compensation)
+  grantSpecialLeave: adminProcedure
+    .input(
+      z.object({
+        userIds: z.array(z.number()).min(1),
+        fiscalYear: z.number(),
+        days: z.number().min(0.5).max(30),
+        reason: z.string().min(1),
+        workDate: z.string(), // YYYY-MM-DD of the weekend worked
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      // Server-side weekend validation
+      const workDay = new Date(input.workDate);
+      const dayOfWeek = workDay.getUTCDay(); // 0=Sun, 6=Sat
+      if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: `${input.workDate}은 주말이 아닙니다 (${['일','월','화','수','목','금','토'][dayOfWeek]}요일). 주말 출근 보상 연차는 토요일 또는 일요일 날짜만 입력 가능합니다.`,
+        });
+      }
+      const results: { userId: number; success: boolean }[] = [];
+      for (const userId of input.userIds) {
+        try {
+          // 1. Upsert balance — add granted days
+          const existing = await getLeaveBalance(userId, input.fiscalYear);
+          if (existing) {
+            const newTotal = Number(existing.totalGranted) + input.days;
+            const newRemaining = Number(existing.remaining) + input.days;
+            await upsertLeaveBalance({
+              userId,
+              fiscalYear: input.fiscalYear,
+              totalGranted: String(newTotal),
+              used: existing.used,
+              remaining: String(newRemaining),
+            });
+          } else {
+            await upsertLeaveBalance({
+              userId,
+              fiscalYear: input.fiscalYear,
+              totalGranted: String(input.days),
+              used: '0',
+              remaining: String(input.days),
+            });
+          }
+          // 2. Record as leave adjustment for audit trail
+          await createLeaveAdjustment({
+            userId,
+            fiscalYear: input.fiscalYear,
+            adjustmentDays: String(input.days),
+            reason: `[주말출근 보상] ${input.workDate} 출근 — ${input.reason}`,
+            adjustedBy: ctx.user.id,
+          });
+          // 3. Notify the employee
+          await createNotification({
+            userId,
+            type: 'leave_approved',
+            title: '특별 연차 부여',
+            message: `${input.fiscalYear}년 특별 연차 ${input.days}일이 부여되었습니다. 사유: ${input.workDate} 주말 출근 보상 (${input.reason})`,
+          });
+          results.push({ userId, success: true });
+        } catch {
+          results.push({ userId, success: false });
+        }
+      }
+      return { results, granted: results.filter((r) => r.success).length };
+    }),
+
   exportCsv: adminProcedure
     .input(z.object({ fiscalYear: z.number() }))
     .query(async ({ input }) => {
