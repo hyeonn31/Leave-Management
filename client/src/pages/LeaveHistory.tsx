@@ -1,7 +1,7 @@
 import DashboardLayout from "@/components/DashboardLayout";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
-import { CalendarDays, CalendarX, CheckCircle, AlertCircle, XCircle, Trash2 } from "lucide-react";
+import { CalendarDays, CalendarX, CheckCircle, Clock, XCircle, Trash2, Users } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
@@ -15,12 +15,121 @@ const LEAVE_TYPE_LABELS: Record<string, string> = {
   unpaid: "무급 휴가",
 };
 
-const STATUS_CONFIG = {
-  pending:  { label: "대기중",  icon: <AlertCircle size={11} />, cls: "status-pending" },
-  approved: { label: "승인됨",  icon: <CheckCircle size={11} />, cls: "status-approved" },
-  rejected: { label: "반려됨",  icon: <XCircle size={11} />,    cls: "status-rejected" },
-};
+// ─── Approval Progress Bar ─────────────────────────────────────────────────────
+type StepState = "done" | "active" | "rejected" | "waiting";
 
+interface ApprovalStep {
+  label: string;
+  state: StepState;
+}
+
+function getApprovalSteps(r: {
+  teamApprovalStatus?: string | null;
+  status: string;
+}): ApprovalStep[] {
+  const hasTeam = r.teamApprovalStatus && r.teamApprovalStatus !== "none";
+
+  if (!hasTeam) {
+    // No team — 2 steps: 신청 접수 → HR 최종 승인
+    const hrState: StepState =
+      r.status === "approved" ? "done" :
+      r.status === "rejected" ? "rejected" :
+      "active";
+    return [
+      { label: "신청 접수", state: "done" },
+      { label: "HR 최종 승인", state: hrState },
+    ];
+  }
+
+  // Has team — 3 steps: 신청 접수 → 팀장 승인 → HR 최종 승인
+  const teamState: StepState =
+    r.teamApprovalStatus === "approved" ? "done" :
+    r.teamApprovalStatus === "rejected" ? "rejected" :
+    "active";
+
+  const hrState: StepState =
+    r.teamApprovalStatus === "rejected" ? "waiting" :
+    r.status === "approved" ? "done" :
+    r.status === "rejected" ? "rejected" :
+    r.teamApprovalStatus === "approved" ? "active" :
+    "waiting";
+
+  return [
+    { label: "신청 접수", state: "done" },
+    { label: "팀장 승인", state: teamState },
+    { label: "HR 최종 승인", state: hrState },
+  ];
+}
+
+function StepIcon({ state }: { state: StepState }) {
+  if (state === "done") return (
+    <div className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: "oklch(55% 0.18 145)" }}>
+      <CheckCircle size={14} className="text-white" />
+    </div>
+  );
+  if (state === "rejected") return (
+    <div className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: "oklch(55% 0.22 25)" }}>
+      <XCircle size={14} className="text-white" />
+    </div>
+  );
+  if (state === "active") return (
+    <div
+      className="w-7 h-7 rounded-full flex items-center justify-center"
+      style={{ background: "oklch(93% 0.06 264)", boxShadow: "0 0 0 2px var(--color-primary)" }}
+    >
+      <Clock size={13} style={{ color: "var(--color-primary)" }} />
+    </div>
+  );
+  // waiting
+  return (
+    <div className="w-7 h-7 rounded-full flex items-center justify-center bg-muted">
+      <div className="w-2 h-2 rounded-full bg-muted-foreground/30" />
+    </div>
+  );
+}
+
+function connectorColor(state: StepState): string {
+  if (state === "done") return "oklch(55% 0.18 145)";
+  if (state === "rejected") return "oklch(55% 0.22 25)";
+  return "oklch(90% 0 0)";
+}
+
+function ApprovalProgressBar({ request }: { request: any }) {
+  const steps = getApprovalSteps(request);
+  return (
+    <div className="px-5 pb-4 pt-0 ml-14">
+      <div className="flex items-start gap-0">
+        {steps.map((step, i) => (
+          <div key={step.label} className="flex items-center">
+            {i > 0 && (
+              <div
+                className="h-0.5 w-8 sm:w-14 mt-[-14px] transition-colors duration-300"
+                style={{ background: connectorColor(steps[i - 1].state) }}
+              />
+            )}
+            <div className="flex flex-col items-center gap-1">
+              <StepIcon state={step.state} />
+              <span
+                className="text-[10px] font-medium whitespace-nowrap leading-tight"
+                style={{
+                  color:
+                    step.state === "done" ? "oklch(45% 0.18 145)" :
+                    step.state === "rejected" ? "oklch(45% 0.22 25)" :
+                    step.state === "active" ? "var(--color-primary)" :
+                    "oklch(70% 0 0)",
+                }}
+              >
+                {step.label}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Component ────────────────────────────────────────────────────────────
 export default function LeaveHistory() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
@@ -86,12 +195,24 @@ export default function LeaveHistory() {
             <h3 className="font-semibold text-foreground">{selectedYear}년 연차 신청 내역</h3>
             <p className="text-xs text-muted-foreground mt-0.5">총 {(requests ?? []).length}건</p>
           </div>
+          {/* Legend */}
+          <div className="hidden sm:flex items-center gap-3 text-[10px] text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full inline-block" style={{ background: "oklch(55% 0.18 145)" }} />완료
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full inline-block" style={{ background: "var(--color-primary)" }} />진행중
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full inline-block" style={{ background: "oklch(55% 0.22 25)" }} />반려
+            </span>
+          </div>
         </div>
 
         {isLoading ? (
           <div className="p-5 space-y-3">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="h-14 bg-muted rounded-xl animate-pulse" />
+              <div key={i} className="h-20 bg-muted rounded-xl animate-pulse" />
             ))}
           </div>
         ) : (requests ?? []).length === 0 ? (
@@ -102,9 +223,10 @@ export default function LeaveHistory() {
         ) : (
           <div className="divide-y divide-border">
             {(requests as any[]).map((r) => {
-              const st = STATUS_CONFIG[r.status as keyof typeof STATUS_CONFIG] ?? STATUS_CONFIG.pending;
+              const hasTeam = r.teamApprovalStatus && r.teamApprovalStatus !== "none";
               return (
                 <div key={r.id} className="hover:bg-muted/30 transition-colors">
+                  {/* Main row */}
                   <div className="flex items-center gap-4 px-5 py-4">
                     <div
                       className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
@@ -121,6 +243,11 @@ export default function LeaveHistory() {
                         <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
                           {r.totalDays}일
                         </span>
+                        {hasTeam && (
+                          <span className="text-[10px] flex items-center gap-0.5 text-muted-foreground">
+                            <Users size={9} />팀 승인
+                          </span>
+                        )}
                       </div>
                       <p className="text-xs text-muted-foreground">
                         {new Date(r.startDate).toLocaleDateString("ko-KR")} ~ {new Date(r.endDate).toLocaleDateString("ko-KR")}
@@ -129,10 +256,6 @@ export default function LeaveHistory() {
                     </div>
 
                     <div className="flex items-center gap-3 shrink-0">
-                      <span className={st.cls}>
-                        {st.icon}
-                        {st.label}
-                      </span>
                       <span className="text-xs text-muted-foreground hidden sm:block">
                         {new Date(r.createdAt).toLocaleDateString("ko-KR")}
                       </span>
@@ -149,8 +272,13 @@ export default function LeaveHistory() {
                       )}
                     </div>
                   </div>
-                  {r.status === "rejected" && r.rejectionReason && (
-                    <div className="px-5 pb-3 -mt-1 ml-14">
+
+                  {/* Approval Progress Bar */}
+                  <ApprovalProgressBar request={r} />
+
+                  {/* Rejection reason */}
+                  {(r.status === "rejected" || r.teamApprovalStatus === "rejected") && r.rejectionReason && (
+                    <div className="px-5 pb-3 -mt-2 ml-14">
                       <p className="text-xs text-destructive bg-red-50 px-3 py-1.5 rounded-lg">
                         반려 사유: {r.rejectionReason}
                       </p>

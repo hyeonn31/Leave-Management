@@ -23,6 +23,7 @@ import {
   getLeaveRequestsByUser,
   getAllLeaveRequests,
   updateLeaveRequestStatus,
+  updateTeamApprovalStatus,
   cancelLeaveRequest,
   createLeaveAdjustment,
   getLeaveAdjustmentsByUser,
@@ -401,6 +402,9 @@ const leaveRequestRouter = router({
         }
       }
 
+      // Check if employee belongs to a team (requires team approval step)
+      const empForTeam = await getEmployeeByUserId(ctx.user.id);
+      const hasTeam = !!empForTeam?.teamId;
       const requestId = await createLeaveRequest({
         userId: ctx.user.id,
         leaveType: input.leaveType,
@@ -409,7 +413,21 @@ const leaveRequestRouter = router({
         totalDays: String(totalDays),
         reason: input.reason,
         status: "pending",
+        teamApprovalStatus: hasTeam ? "pending" : "none",
       });
+      // If has team, notify the team approver
+      if (hasTeam && empForTeam?.teamId) {
+        const teamRow = await getTeamById(empForTeam.teamId);
+        if (teamRow?.team?.approverId) {
+          await createNotification({
+            userId: teamRow.team.approverId,
+            type: "team_leave_request",
+            title: "팀 연차 승인 요청",
+            message: `${ctx.user.name ?? "직원"}님이 연차를 신청했습니다. (${input.startDate} ~ ${input.endDate}, ${totalDays}일)`,
+            relatedId: requestId,
+          });
+        }
+      }
 
       // Notify all admins
       const allUsers = await getAllUsers();
@@ -834,7 +852,7 @@ const teamRouter = router({
       if (ctx.user.role !== "admin" && (!emp?.teamId || !myTeamIds.includes(emp.teamId))) {
         throw new TRPCError({ code: "FORBIDDEN", message: "해당 직원의 팀장이 아닙니다." });
       }
-      await updateLeaveRequestStatus(input.requestId, "approved", ctx.user.id);
+      await updateTeamApprovalStatus(input.requestId, "approved", ctx.user.id);
       await createNotification({ userId: request.userId, type: "team_leave_approved", title: "팀장 승인 완료", message: `${request.startDate} ~ ${request.endDate} 연차 신청이 팀장에 의해 승인되었습니다.`, relatedId: input.requestId });
       return { success: true };
     }),
@@ -849,7 +867,7 @@ const teamRouter = router({
       if (ctx.user.role !== "admin" && (!emp?.teamId || !myTeamIds.includes(emp.teamId))) {
         throw new TRPCError({ code: "FORBIDDEN", message: "해당 직원의 팀장이 아닙니다." });
       }
-      await updateLeaveRequestStatus(input.requestId, "rejected", ctx.user.id, input.reason);
+      await updateTeamApprovalStatus(input.requestId, "rejected", ctx.user.id);
       await createNotification({ userId: request.userId, type: "team_leave_rejected", title: "팀장 반려", message: `${request.startDate} ~ ${request.endDate} 연차 신청이 반려되었습니다. 사유: ${input.reason}`, relatedId: input.requestId });
       return { success: true };
     }),

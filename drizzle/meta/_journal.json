@@ -29,6 +29,13 @@
       "when": 1780044654478,
       "tag": "0003_square_goblin_queen",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1780046638800,
+      "tag": "0004_steep_dust",
+      "breakpoints": true
     }
   ]
 }

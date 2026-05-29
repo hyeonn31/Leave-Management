@@ -263,6 +263,22 @@ export async function updateLeaveRequestStatus(
     .where(eq(leaveRequests.id, id));
 }
 
+export async function updateTeamApprovalStatus(
+  id: number,
+  teamApprovalStatus: "pending" | "approved" | "rejected",
+  teamApproverId: number
+) {
+  const db = await getDb();
+  if (!db) return;
+  await db
+    .update(leaveRequests)
+    .set({
+      teamApprovalStatus,
+      teamApproverId,
+      teamApprovedAt: new Date(),
+    })
+    .where(eq(leaveRequests.id, id));
+}
 export async function cancelLeaveRequest(id: number) {
   const db = await getDb();
   if (!db) return;
