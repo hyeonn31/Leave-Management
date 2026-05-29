@@ -309,12 +309,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <div className="min-h-screen flex items-center justify-center bg-background px-4">
         <div className="w-full max-w-sm">
           <div className="bg-card rounded-3xl p-8 shadow-card text-center">
-            <div
-              className="w-14 h-14 rounded-2xl flex items-center justify-center text-white font-bold text-xl mx-auto mb-6"
-              style={{ background: "var(--color-primary)" }}
-            >
-              HR
-            </div>
+            {/* ABLE games 로고 */}
+            <img
+              src="/manus-storage/Logo_Gray_1745409d.png"
+              alt="ABLE games"
+              className="mx-auto mb-6"
+              style={{ height: "48px", width: "auto" }}
+            />
             <h1 className="text-2xl font-bold text-foreground mb-1">연차 관리 시스템</h1>
             <p className="text-sm text-muted-foreground mb-8">HR 업무 전반을 하나의 플랫폼에서 처리하세요.</p>
             <a
