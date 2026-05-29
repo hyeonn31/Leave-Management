@@ -5,6 +5,7 @@ import { Edit2, RefreshCw, Check, Users, Wallet, UserPlus } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import DashboardLayout from "@/components/DashboardLayout";
 
 function toDateInputValue(val: unknown): string {
@@ -60,6 +61,8 @@ export default function AdminEmployees() {
     userId: 0, employeeNumber: "", department: "", position: "", entryDate: "",
   });
   const { data: allUsers } = trpc.employee.listAllUsers.useQuery(undefined, { enabled: showRegisterDialog });
+  // Fetch team list for department dropdown
+  const { data: teamList } = trpc.team.listAll.useQuery();
 
   const registeredUserIds = new Set((employees ?? []).map((e) => e.user.id));
   const unregisteredUsers = (allUsers ?? []).filter((u) => !registeredUserIds.has(u.id));
@@ -267,22 +270,51 @@ export default function AdminEmployees() {
           </DialogHeader>
 
           <div className="space-y-4 py-2">
-            {[
-              { label: "사번", key: "employeeNumber", placeholder: "EMP-001" },
-              { label: "부서", key: "department", placeholder: "개발팀" },
-              { label: "직급", key: "position", placeholder: "선임 개발자" },
-            ].map(({ label, key, placeholder }) => (
-              <div key={key}>
-                <label className="block text-xs font-medium text-muted-foreground mb-1.5">{label}</label>
-                <input
-                  type="text"
-                  value={form[key as keyof typeof form] as string}
-                  onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
-                  placeholder={placeholder}
-                  className="w-full h-10 rounded-xl border border-border px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
-                />
-              </div>
-            ))}
+            {/* 사번 */}
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1.5">사번</label>
+              <input
+                type="text"
+                value={form.employeeNumber}
+                onChange={(e) => setForm((f) => ({ ...f, employeeNumber: e.target.value }))}
+                placeholder="EMP-001"
+                className="w-full h-10 rounded-xl border border-border px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
+              />
+            </div>
+            {/* 부서 — 팀 목록 드롭다운 */}
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1.5">부서 (팀)</label>
+              <Select
+                value={form.department || "__none__"}
+                onValueChange={(v) => setForm((f) => ({ ...f, department: v === "__none__" ? "" : v }))}
+              >
+                <SelectTrigger className="w-full h-10 rounded-xl">
+                  <SelectValue placeholder="팀을 선택하세요" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">선택 안함</SelectItem>
+                  {(teamList ?? []).map((t) => (
+                    <SelectItem key={t.team.id} value={t.team.name}>
+                      {t.team.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {(teamList ?? []).length === 0 && (
+                <p className="mt-1 text-xs text-muted-foreground">팀 관리에서 팀을 먼저 생성해주세요.</p>
+              )}
+            </div>
+            {/* 직급 */}
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1.5">직급</label>
+              <input
+                type="text"
+                value={form.position}
+                onChange={(e) => setForm((f) => ({ ...f, position: e.target.value }))}
+                placeholder="선임 개발자"
+                className="w-full h-10 rounded-xl border border-border px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
+              />
+            </div>
 
             {form.role !== "admin" && (
             <div>
@@ -568,27 +600,37 @@ export default function AdminEmployees() {
                 className="w-full h-10 rounded-xl border border-border px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
               />
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-muted-foreground mb-1.5">부서</label>
-                <input
-                  type="text"
-                  value={regForm.department}
-                  onChange={(e) => setRegForm((f) => ({ ...f, department: e.target.value }))}
-                  placeholder="개발팀"
-                  className="w-full h-10 rounded-xl border border-border px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-muted-foreground mb-1.5">직급</label>
-                <input
-                  type="text"
-                  value={regForm.position}
-                  onChange={(e) => setRegForm((f) => ({ ...f, position: e.target.value }))}
-                  placeholder="선임 개발자"
-                  className="w-full h-10 rounded-xl border border-border px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
-                />
-              </div>
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1.5">부서 (팀)</label>
+              <Select
+                value={regForm.department || "__none__"}
+                onValueChange={(v) => setRegForm((f) => ({ ...f, department: v === "__none__" ? "" : v }))}
+              >
+                <SelectTrigger className="w-full h-10 rounded-xl">
+                  <SelectValue placeholder="팀을 선택하세요" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">선택 안함</SelectItem>
+                  {(teamList ?? []).map((t) => (
+                    <SelectItem key={t.team.id} value={t.team.name}>
+                      {t.team.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {(teamList ?? []).length === 0 && (
+                <p className="mt-1 text-xs text-muted-foreground">팀 관리에서 팀을 먼저 생성해주세요.</p>
+              )}
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1.5">직급</label>
+              <input
+                type="text"
+                value={regForm.position}
+                onChange={(e) => setRegForm((f) => ({ ...f, position: e.target.value }))}
+                placeholder="선임 개발자"
+                className="w-full h-10 rounded-xl border border-border px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
+              />
             </div>
             <div>
               <label className="block text-xs font-medium text-muted-foreground mb-1.5">
