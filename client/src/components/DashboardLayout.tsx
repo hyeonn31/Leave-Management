@@ -29,11 +29,14 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { label: "대시보드", href: "/", icon: <Home size={16} /> },
-  { label: "연차 신청", href: "/leave/request", icon: <CalendarDays size={16} /> },
-  { label: "연차 이력", href: "/leave/history", icon: <CalendarCheck size={16} /> },
+  { label: "연차 신청", href: "/leave/request", icon: <CalendarDays size={16} />, adminOnly: false },
+  { label: "연차 이력", href: "/leave/history", icon: <CalendarCheck size={16} />, adminOnly: false },
   { label: "알림", href: "/notifications", icon: <Bell size={16} /> },
   { label: "내 프로필", href: "/profile", icon: <Settings size={16} /> },
 ];
+
+// Items hidden from admin users (admin has no personal leave)
+const EMPLOYEE_ONLY_HREFS = ["/leave/request", "/leave/history"];
 
 const ADMIN_NAV_ITEMS: NavItem[] = [
   { label: "관리자 대시보드", href: "/admin", icon: <BarChart3 size={16} />, adminOnly: true },
@@ -125,22 +128,23 @@ function Sidebar({
         <p className="px-3 pb-2 text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--color-sidebar-muted)" }}>
           메뉴
         </p>
-        {NAV_ITEMS.map((item) => (
-          <Link key={item.href} href={item.href} onClick={onClose}>
-            <a
-              className={`nav-item ${isActive(item.href) ? "active" : ""}`}
-            >
-              {item.icon}
-              <span>{item.label}</span>
-              {item.href === "/notifications" && unreadCount > 0 && (
-                <span
-                  className="ml-auto w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold"
-                  style={{ background: "var(--color-primary)", color: "#fff" }}
-                >
-                  {unreadCount > 9 ? "9+" : unreadCount}
-                </span>
-              )}
-            </a>
+        {NAV_ITEMS.filter((item) => !(isAdmin && EMPLOYEE_ONLY_HREFS.includes(item.href))).map((item) => (
+          <Link
+            key={item.href}
+            href={item.href}
+            onClick={onClose}
+            className={`nav-item ${isActive(item.href) ? "active" : ""}`}
+          >
+            {item.icon}
+            <span>{item.label}</span>
+            {item.href === "/notifications" && unreadCount > 0 && (
+              <span
+                className="ml-auto w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold"
+                style={{ background: "var(--color-primary)", color: "#fff" }}
+              >
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            )}
           </Link>
         ))}
 
@@ -150,13 +154,14 @@ function Sidebar({
               관리자
             </p>
             {ADMIN_NAV_ITEMS.map((item) => (
-              <Link key={item.href} href={item.href} onClick={onClose}>
-                <a
-                  className={`nav-item ${isActive(item.href) ? "active" : ""}`}
-                >
-                  <Shield size={14} className="shrink-0 opacity-60" />
-                  <span>{item.label}</span>
-                </a>
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={onClose}
+                className={`nav-item ${isActive(item.href) ? "active" : ""}`}
+              >
+                <Shield size={14} className="shrink-0 opacity-60" />
+                <span>{item.label}</span>
               </Link>
             ))}
           </>
@@ -208,18 +213,20 @@ function Header({
       </div>
 
       <div className="flex items-center gap-2 ml-auto">
-        <Link href="/notifications">
-          <a className="relative p-2 rounded-xl hover:bg-muted transition-colors">
-            <Bell size={18} className="text-muted-foreground" />
-            {unreadCount > 0 && (
-              <span
-                className="absolute top-1 right-1 w-4 h-4 rounded-full flex items-center justify-center text-xs font-bold text-white"
-                style={{ background: "var(--color-primary)", fontSize: "9px" }}
-              >
-                {unreadCount > 9 ? "9+" : unreadCount}
-              </span>
-            )}
-          </a>
+        <Link
+          href="/notifications"
+          className="relative p-2 rounded-xl hover:bg-muted transition-colors"
+          style={{ display: "inline-flex" }}
+        >
+          <Bell size={18} className="text-muted-foreground" />
+          {unreadCount > 0 && (
+            <span
+              className="absolute top-1 right-1 w-4 h-4 rounded-full flex items-center justify-center text-xs font-bold text-white"
+              style={{ background: "var(--color-primary)", fontSize: "9px" }}
+            >
+              {unreadCount > 9 ? "9+" : unreadCount}
+            </span>
+          )}
         </Link>
       </div>
     </header>

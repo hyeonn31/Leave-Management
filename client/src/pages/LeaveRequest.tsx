@@ -1,4 +1,5 @@
 import DashboardLayout from "@/components/DashboardLayout";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -22,7 +23,14 @@ const LEAVE_TYPES = [
 type LeaveTypeValue = (typeof LEAVE_TYPES)[number]["value"];
 
 export default function LeaveRequest() {
+  const { user } = useAuth();
   const [, setLocation] = useLocation();
+
+  // Admin has no personal leave — redirect to admin dashboard
+  if (user?.role === "admin") {
+    setLocation("/admin");
+    return null;
+  }
   const currentYear = new Date().getFullYear();
 
   const [leaveType, setLeaveType] = useState<LeaveTypeValue>("annual");

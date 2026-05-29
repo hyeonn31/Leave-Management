@@ -1,8 +1,10 @@
 import DashboardLayout from "@/components/DashboardLayout";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { CalendarDays, CalendarX, CheckCircle, AlertCircle, XCircle, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { useLocation } from "wouter";
 
 const LEAVE_TYPE_LABELS: Record<string, string> = {
   annual: "연차",
@@ -20,6 +22,15 @@ const STATUS_CONFIG = {
 };
 
 export default function LeaveHistory() {
+  const { user } = useAuth();
+  const [, setLocation] = useLocation();
+
+  // Admin has no personal leave — redirect to admin dashboard
+  if (user?.role === "admin") {
+    setLocation("/admin");
+    return null;
+  }
+
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState(currentYear);
   const years = [currentYear - 1, currentYear];

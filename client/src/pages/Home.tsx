@@ -12,8 +12,8 @@ import {
   XCircle,
   AlertCircle,
 } from "lucide-react";
-import { useState } from "react";
-import { Link } from "wouter";
+import { useEffect, useState } from "react";
+import { Link, useLocation } from "wouter";
 
 const LEAVE_TYPE_LABELS: Record<string, string> = {
   annual: "연차",
@@ -32,12 +32,25 @@ const STATUS_CONFIG = {
 
 export default function Home() {
   const { user } = useAuth();
+  const [, navigate] = useLocation();
+  const isAdmin = user?.role === "admin";
   const currentYear = new Date().getFullYear();
   const [year] = useState(currentYear);
 
-  const { data: balance, isLoading: balLoading } = trpc.leaveBalance.getMyBalance.useQuery({ fiscalYear: year });
-  const { data: requests, isLoading: reqLoading } = trpc.leaveRequest.myList.useQuery({ fiscalYear: year });
-  const { data: employee } = trpc.employee.getMyProfile.useQuery();
+  // Redirect admin users to admin dashboard
+  useEffect(() => {
+    if (isAdmin) navigate("/admin");
+  }, [isAdmin, navigate]);
+
+  const { data: balance, isLoading: balLoading } = trpc.leaveBalance.getMyBalance.useQuery(
+    { fiscalYear: year },
+    { enabled: !isAdmin }
+  );
+  const { data: requests, isLoading: reqLoading } = trpc.leaveRequest.myList.useQuery(
+    { fiscalYear: year },
+    { enabled: !isAdmin }
+  );
+  const { data: employee } = trpc.employee.getMyProfile.useQuery(undefined, { enabled: !isAdmin });
 
   const recent = (requests ?? []).slice(0, 5);
   const pending = (requests ?? []).filter((r: any) => r.status === "pending").length;
