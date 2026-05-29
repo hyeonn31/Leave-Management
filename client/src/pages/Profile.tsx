@@ -3,7 +3,7 @@ import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { User, Building2, Briefcase, Calendar, Hash, Pencil, X, Save, ShieldCheck } from "lucide-react";
+import { User, Building2, Briefcase, Calendar, Hash, Pencil, X, Save, ShieldCheck, Clock, Info } from "lucide-react";
 
 function toDateInputValue(val: unknown): string {
   if (!val) return "";
@@ -77,6 +77,7 @@ export default function Profile() {
   }
 
   const hasProfile = !!profile?.employee?.entryDate;
+  const isAdmin = user?.role === "admin";
 
   return (
     <DashboardLayout>
@@ -101,40 +102,55 @@ export default function Profile() {
               <span
                 className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full"
                 style={
-                  user?.role === "admin"
+                  isAdmin
                     ? { background: "oklch(93% 0.06 264)", color: "var(--color-primary)" }
                     : { background: "oklch(93% 0.02 264)", color: "oklch(50% 0.02 264)" }
                 }
               >
-                {user?.role === "admin" ? "HR 관리자" : "일반 직원"}
+                {isAdmin ? "HR 관리자" : "일반 직원"}
               </span>
             </div>
           </div>
         </div>
 
         {/* Employee profile card */}
-        {!hasProfile && !editing ? (
-          <div className="bg-card rounded-2xl shadow-card p-8 flex flex-col items-center text-center">
-            <div
-              className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
-              style={{ background: "oklch(93% 0.06 264)" }}
-            >
-              <User size={24} style={{ color: "var(--color-primary)" }} />
+        {!hasProfile && !isAdmin ? (
+          /* ── 미등록 일반 직원: 관리자 처리 대기 안내 ── */
+          <div className="bg-card rounded-2xl shadow-card overflow-hidden">
+            <div className="px-5 py-4 border-b border-border flex items-center gap-2">
+              <User size={16} style={{ color: "var(--color-primary)" }} />
+              <h3 className="font-semibold text-foreground text-sm">직원 정보</h3>
             </div>
-            <p className="font-semibold text-foreground mb-1">직원 정보가 없습니다</p>
-            <p className="text-sm text-muted-foreground mb-5">입사일을 등록해야 연차가 자동으로 산정됩니다.</p>
-            <button onClick={() => setEditing(true)} className="btn-primary">
-              정보 등록하기
-            </button>
+            <div className="px-6 py-8 flex flex-col items-center text-center">
+              <div
+                className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
+                style={{ background: "oklch(96% 0.04 85)" }}
+              >
+                <Clock size={24} style={{ color: "oklch(55% 0.18 85)" }} />
+              </div>
+              <p className="font-semibold text-foreground mb-1">관리자가 등록을 처리 중입니다</p>
+              <p className="text-sm text-muted-foreground mb-4">
+                직원 정보 등록은 HR 관리자만 처리할 수 있습니다.<br />
+                등록이 완료되면 연차가 자동으로 산정됩니다.
+              </p>
+              <div className="flex items-start gap-2 px-4 py-3 rounded-xl bg-muted/50 border border-border w-full max-w-sm text-left">
+                <Info size={14} className="text-muted-foreground shrink-0 mt-0.5" />
+                <p className="text-xs text-muted-foreground">
+                  등록 처리가 지연되는 경우 HR 담당자에게 직접 문의해 주세요.
+                </p>
+              </div>
+            </div>
           </div>
-        ) : (
+        ) : hasProfile ? (
+          /* ── 등록된 직원: 정보 표시 (일반 직원은 읽기 전용) ── */
           <form onSubmit={handleSubmit} className="bg-card rounded-2xl shadow-card overflow-hidden">
             <div className="px-5 py-4 border-b border-border flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <User size={16} style={{ color: "var(--color-primary)" }} />
                 <h3 className="font-semibold text-foreground text-sm">직원 정보</h3>
               </div>
-              {!editing && (
+              {/* 수정 버튼은 관리자만 표시 */}
+              {isAdmin && !editing && (
                 <button type="button" onClick={() => setEditing(true)} className="btn-ghost text-xs">
                   <Pencil size={13} /> 수정
                 </button>
@@ -151,7 +167,7 @@ export default function Profile() {
                   <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground mb-1.5">
                     {f.icon} {f.label}
                   </label>
-                  {editing ? (
+                  {editing && isAdmin ? (
                     <input
                       type="text"
                       value={form[f.key as keyof typeof form]}
@@ -171,7 +187,7 @@ export default function Profile() {
                 <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground mb-1.5">
                   <Calendar size={14} /> 입사일 <span className="text-destructive">*</span>
                 </label>
-                {editing ? (
+                {editing && isAdmin ? (
                   <input
                     type="date"
                     value={form.entryDate}
@@ -187,7 +203,7 @@ export default function Profile() {
               </div>
             </div>
 
-            {editing && (
+            {editing && isAdmin && (
               <div className="px-5 py-4 bg-muted/30 border-t border-border flex items-center justify-between">
                 <button type="button" onClick={cancelEdit} className="btn-ghost">
                   <X size={14} /> 취소
@@ -199,7 +215,7 @@ export default function Profile() {
               </div>
             )}
           </form>
-        )}
+        ) : null}
       </div>
     </DashboardLayout>
   );

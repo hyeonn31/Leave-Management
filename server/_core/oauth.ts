@@ -3,6 +3,7 @@ import type { Express, Request, Response } from "express";
 import * as db from "../db";
 import { getSessionCookieOptions } from "./cookies";
 import { sdk } from "./sdk";
+import { notifyOwner } from "./notification";
 
 function getQueryParam(req: Request, key: string): string | undefined {
   const value = req.query[key];
@@ -28,13 +29,21 @@ export function registerOAuthRoutes(app: Express) {
         return;
       }
 
-      await db.upsertUser({
+      const { isNew } = await db.upsertUser({
         openId: userInfo.openId,
         name: userInfo.name || null,
         email: userInfo.email ?? null,
         loginMethod: userInfo.loginMethod ?? userInfo.platform ?? null,
         lastSignedIn: new Date(),
       });
+      // Notify owner when a new user signs up
+      if (isNew) {
+        const displayName = userInfo.name || userInfo.email || userInfo.openId;
+        notifyOwner({
+          title: "[HR] 신규 회원 가입 알림",
+          content: `새로운 직원이 가입했습니다.\n\n이름: ${displayName}\n이메일: ${userInfo.email ?? "(없음)"}\n\n직원 관리 페이지에서 직원 정보를 등록해 주세요.`,
+        }).catch((e) => console.warn("[OAuth] Failed to notify owner:", e));
+      }
 
       const sessionToken = await sdk.createSessionToken(userInfo.openId, {
         name: userInfo.name || "",
