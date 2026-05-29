@@ -112,7 +112,7 @@ export default function LeaveHistory() {
                         </span>
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        {String(r.startDate).slice(0, 10)} ~ {String(r.endDate).slice(0, 10)}
+                        {new Date(r.startDate).toLocaleDateString("ko-KR")} ~ {new Date(r.endDate).toLocaleDateString("ko-KR")}
                         {r.reason && ` · ${r.reason}`}
                       </p>
                     </div>

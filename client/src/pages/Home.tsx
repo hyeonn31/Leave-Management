@@ -231,7 +231,7 @@ export default function Home() {
                       {LEAVE_TYPE_LABELS[r.leaveType] ?? r.leaveType}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {r.startDate?.slice(0, 10)} ~ {r.endDate?.slice(0, 10)} · {r.totalDays}일
+                      {r.startDate ? new Date(r.startDate).toLocaleDateString("ko-KR") : "-"} ~ {r.endDate ? new Date(r.endDate).toLocaleDateString("ko-KR") : "-"} · {r.totalDays}일
                     </p>
                   </div>
                   <span className={st.cls}>

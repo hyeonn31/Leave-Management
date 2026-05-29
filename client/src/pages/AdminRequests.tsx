@@ -104,7 +104,7 @@ export default function AdminRequests() {
                       </span>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      {String(req.startDate).slice(0, 10)} ~ {String(req.endDate).slice(0, 10)} · {req.totalDays}일
+                      {new Date(req.startDate).toLocaleDateString("ko-KR")} ~ {new Date(req.endDate).toLocaleDateString("ko-KR")} · {req.totalDays}일
                       {req.reason && ` · ${req.reason}`}
                     </p>
                   </div>
