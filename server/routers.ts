@@ -120,15 +120,18 @@ const employeeRouter = router({
 
       const entryDate = new Date(employee.entryDate);
       const fiscalYear = input.fiscalYear;
-
       // 1) 해당 연도에 승인된 연차 신청의 실제 사용 일수를 집계
       const requests = await getLeaveRequestsByUser(input.userId, fiscalYear);
       const usedDays = requests
         .filter((r) => r.status === "approved")
         .reduce((sum, r) => sum + Number(r.totalDays), 0);
-
       // 2) 입사일 기준으로 해당 연도의 법정 부여 일수 재계산
-      const totalGranted = calculateGrantedDaysForYear(entryDate, fiscalYear, "entry_date");
+      // 기준일: 해당 연도 마지막 날(12/31) 또는 오늘 중 더 이른 날 사용
+      // → 입사 당해연도라도 실제 근속 개월 수를 정확히 반영
+      const fiscalYearEnd = new Date(fiscalYear, 11, 31);
+      const today = new Date();
+      const referenceDate = fiscalYearEnd < today ? fiscalYearEnd : today;
+      const totalGranted = calculateLeaveEntitlement(entryDate, referenceDate).totalDays;
       const remaining = Math.max(0, totalGranted - usedDays);
 
       // 3) leave_balances upsert (totalGranted + used 재설정, remaining 재계산)

@@ -9,6 +9,7 @@ import {
   date,
   boolean,
   index,
+  uniqueIndex,
 } from "drizzle-orm/mysql-core";
 
 // ─── Core Auth Table ───────────────────────────────────────────────────────────
@@ -56,7 +57,7 @@ export const leaveBalances = mysqlTable(
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   },
-  (t) => [index("idx_leave_balances_user_year").on(t.userId, t.fiscalYear)]
+  (t) => [uniqueIndex("idx_leave_balances_user_year").on(t.userId, t.fiscalYear)]
 );
 
 export type LeaveBalance = typeof leaveBalances.$inferSelect;
