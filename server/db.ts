@@ -350,22 +350,28 @@ export async function getDepartmentStats(fiscalYear: number) {
 export async function getMonthlyLeaveStats(fiscalYear: number) {
   const db = await getDb();
   if (!db) return [];
-  const result = await db
-    .select({
-      month: sql<number>`MONTH(${leaveRequests.startDate})`,
-      count: sql<number>`COUNT(*)`,
-      totalDays: sql<number>`SUM(${leaveRequests.totalDays})`,
-    })
-    .from(leaveRequests)
-    .where(
-      and(
-        eq(leaveRequests.status, "approved"),
-        gte(leaveRequests.startDate, `${fiscalYear}-01-01` as any),
-        lte(leaveRequests.startDate, `${fiscalYear}-12-31` as any)
-      )
-    )
-    .groupBy(sql`MONTH(${leaveRequests.startDate})`);
-  return result;
+  // Use raw SQL to avoid ONLY_FULL_GROUP_BY issues in TiDB:
+  // GROUP BY alias (m) is supported in MySQL/TiDB and avoids the
+  // "not in GROUP BY clause" error when SELECT expression differs from GROUP BY expression.
+  const result = await db.execute(
+    sql`SELECT
+      MONTH(startDate) AS month,
+      COUNT(*) AS count,
+      SUM(totalDays) AS totalDays
+    FROM leave_requests
+    WHERE status = 'approved'
+      AND startDate >= ${`${fiscalYear}-01-01`}
+      AND startDate <= ${`${fiscalYear}-12-31`}
+    GROUP BY month
+    ORDER BY month`
+  );
+  // drizzle execute returns [rows, fields]; rows is an array of RowDataPacket
+  const rows = (result as any)[0] as Array<{ month: number; count: number; totalDays: number }>;
+  return rows.map((r) => ({
+    month: Number(r.month),
+    count: Number(r.count),
+    totalDays: Number(r.totalDays),
+  }));
 }
 
 export async function getAllLeaveRequestsForExport(fiscalYear: number) {
