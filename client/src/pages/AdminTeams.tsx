@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Users, UserCheck } from "lucide-react";
+import { Plus, Pencil, Trash2, Users, UserCheck, UserMinus, UserPlus } from "lucide-react";
 
 type TeamForm = {
   name: string;
@@ -30,6 +30,7 @@ export default function AdminTeams() {
   // Assign employee to team dialog
   const [showAssign, setShowAssign] = useState(false);
   const [assignTeamId, setAssignTeamId] = useState<number | null>(null);
+  const [assignTeamName, setAssignTeamName] = useState<string>("");
   const [assignUserId, setAssignUserId] = useState<string>("");
 
   const createTeam = trpc.team.create.useMutation({
@@ -72,6 +73,15 @@ export default function AdminTeams() {
     onError: (e) => toast.error(e.message),
   });
 
+  // Remove employee from team (assign to null)
+  const removeEmployee = trpc.team.assignEmployee.useMutation({
+    onSuccess: () => {
+      toast.success("팀 배정이 해제되었습니다.");
+      utils.team.listAll.invalidate();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
   const openCreate = () => {
     setEditTarget(null);
     setForm(EMPTY_FORM);
@@ -106,8 +116,9 @@ export default function AdminTeams() {
     }
   };
 
-  const openAssign = (teamId: number) => {
+  const openAssign = (teamId: number, teamName: string) => {
     setAssignTeamId(teamId);
+    setAssignTeamName(teamName);
     setAssignUserId("");
     setShowAssign(true);
   };
@@ -115,6 +126,24 @@ export default function AdminTeams() {
   const handleAssign = () => {
     if (!assignUserId || !assignTeamId) return;
     assignEmployee.mutate({ userId: Number(assignUserId), teamId: assignTeamId });
+  };
+
+  const handleRemoveMember = (userId: number, memberName: string) => {
+    if (!confirm(`${memberName} 님을 팀에서 제외하시겠습니까?`)) return;
+    removeEmployee.mutate({ userId, teamId: null });
+  };
+
+  // Users not yet in any team (for assign dropdown)
+  const getUnassignedUsers = (currentTeamId: number) => {
+    const assignedUserIds = new Set(
+      (teams as any[]).flatMap((t: any) =>
+        t.members?.map((m: any) => m.user.id) ?? []
+      )
+    );
+    // Also allow re-assigning users already in THIS team to another team
+    return (allUsers as any[]).filter(
+      (u: any) => !assignedUserIds.has(u.id)
+    );
   };
 
   return (
@@ -132,7 +161,7 @@ export default function AdminTeams() {
 
       {isLoading ? (
         <div className="space-y-3">
-          {[1, 2, 3].map((i) => <div key={i} className="h-20 bg-muted rounded-xl animate-pulse" />)}
+          {[1, 2, 3].map((i) => <div key={i} className="h-28 bg-muted rounded-xl animate-pulse" />)}
         </div>
       ) : teams.length === 0 ? (
         <div className="bg-card rounded-2xl p-12 text-center">
@@ -146,19 +175,19 @@ export default function AdminTeams() {
         </div>
       ) : (
         <div className="grid gap-4">
-          {teams.map((t) => (
+          {(teams as any[]).map((t: any) => (
             <div key={t.team.id} className="bg-card rounded-2xl p-5 shadow-card">
-              <div className="flex items-start justify-between gap-4">
+              {/* Team header */}
+              <div className="flex items-start justify-between gap-4 mb-4">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <h3 className="font-semibold text-base">{t.team.name}</h3>
-                    {t.approver && (
+                    {t.approver ? (
                       <Badge variant="secondary" className="gap-1 text-xs">
                         <UserCheck size={11} />
                         승인자: {t.approver.name}
                       </Badge>
-                    )}
-                    {!t.approver && (
+                    ) : (
                       <Badge variant="outline" className="text-xs text-muted-foreground">
                         승인자 미지정
                       </Badge>
@@ -169,9 +198,14 @@ export default function AdminTeams() {
                   )}
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <Button variant="outline" size="sm" onClick={() => openAssign(t.team.id)} className="gap-1 text-xs">
-                    <Users size={13} />
-                    직원 배정
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => openAssign(t.team.id, t.team.name)}
+                    className="gap-1 text-xs"
+                  >
+                    <UserPlus size={13} />
+                    직원 추가
                   </Button>
                   <Button variant="ghost" size="icon" onClick={() => openEdit(t)}>
                     <Pencil size={14} />
@@ -185,6 +219,44 @@ export default function AdminTeams() {
                     <Trash2 size={14} />
                   </Button>
                 </div>
+              </div>
+
+              {/* Member list */}
+              <div className="border-t border-border pt-3">
+                <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
+                  <Users size={12} />
+                  소속 직원 ({t.members?.length ?? 0}명)
+                </p>
+                {t.members && t.members.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {t.members.map((m: any) => (
+                      <div
+                        key={m.user.id}
+                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-muted/60 border border-border"
+                      >
+                        <span
+                          className="w-5 h-5 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
+                          style={{ background: "var(--color-primary)", fontSize: "9px" }}
+                        >
+                          {m.user.name?.charAt(0)?.toUpperCase() ?? "?"}
+                        </span>
+                        <span className="text-foreground">{m.user.name}</span>
+                        {m.employee?.position && (
+                          <span className="text-muted-foreground">· {m.employee.position}</span>
+                        )}
+                        <button
+                          onClick={() => handleRemoveMember(m.user.id, m.user.name)}
+                          className="ml-1 text-muted-foreground hover:text-destructive transition-colors"
+                          title="팀에서 제외"
+                        >
+                          <UserMinus size={11} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground italic">배정된 직원이 없습니다</p>
+                )}
               </div>
             </div>
           ))}
@@ -245,7 +317,7 @@ export default function AdminTeams() {
       <Dialog open={showAssign} onOpenChange={setShowAssign}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>직원 팀 배정</DialogTitle>
+            <DialogTitle>{assignTeamName} — 직원 추가</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div>
@@ -262,12 +334,13 @@ export default function AdminTeams() {
                   ))}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground mt-1">이미 다른 팀에 배정된 직원을 선택하면 해당 팀에서 자동으로 이동됩니다.</p>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAssign(false)}>취소</Button>
             <Button onClick={handleAssign} disabled={!assignUserId || assignEmployee.isPending}>
-              배정
+              추가
             </Button>
           </DialogFooter>
         </DialogContent>

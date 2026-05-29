@@ -796,7 +796,17 @@ export async function handleLeaveRenewal() {
 
 // ─── Team Router ──────────────────────────────────────────────────────────────
 const teamRouter = router({
-  listAll: adminProcedure.query(async () => getAllTeams()),
+  listAll: adminProcedure.query(async () => {
+    const teamList = await getAllTeams();
+    // Attach members to each team
+    const teamsWithMembers = await Promise.all(
+      teamList.map(async (t) => {
+        const members = await getTeamMembers(t.team.id);
+        return { ...t, members };
+      })
+    );
+    return teamsWithMembers;
+  }),
   create: adminProcedure
     .input(z.object({ name: z.string().min(1), description: z.string().optional(), approverId: z.number().nullable().optional() }))
     .mutation(async ({ input }) => {
