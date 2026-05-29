@@ -172,7 +172,6 @@ export default function LeaveRequest() {
                       mode="single"
                       selected={dateRange?.from}
                       onSelect={(d) => setDateRange(d ? { from: d, to: d } : undefined)}
-                      disabled={(d) => d < new Date()}
                       locale={ko}
                     />
                   ) : (
@@ -180,7 +179,6 @@ export default function LeaveRequest() {
                       mode="range"
                       selected={dateRange}
                       onSelect={setDateRange}
-                      disabled={(d) => d < new Date()}
                       numberOfMonths={2}
                       locale={ko}
                     />
