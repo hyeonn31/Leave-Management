@@ -180,11 +180,12 @@ export default function Home() {
             <p className="text-2xl font-bold text-white mb-2">잔여 {remaining}일</p>
             <p className="text-xs text-white/70">지금 바로 연차를 신청하세요</p>
           </div>
-          <Link href="/leave/request">
-            <a className="mt-6 flex items-center justify-between bg-white/20 hover:bg-white/30 transition-colors rounded-xl px-4 py-3 text-sm font-semibold text-white">
-              신청하기
-              <ArrowRight size={16} />
-            </a>
+          <Link
+            href="/leave/request"
+            className="mt-6 flex items-center justify-between bg-white/20 hover:bg-white/30 transition-colors rounded-xl px-4 py-3 text-sm font-semibold text-white"
+          >
+            신청하기
+            <ArrowRight size={16} />
           </Link>
         </div>
       </div>
@@ -193,10 +194,12 @@ export default function Home() {
       <div className="bg-card rounded-2xl shadow-card overflow-hidden">
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <h3 className="font-semibold text-foreground">최근 연차 신청</h3>
-          <Link href="/leave/history">
-            <a className="text-xs font-medium flex items-center gap-1" style={{ color: "var(--color-primary)" }}>
-              전체 보기 <ArrowRight size={12} />
-            </a>
+          <Link
+            href="/leave/history"
+            className="text-xs font-medium flex items-center gap-1"
+            style={{ color: "var(--color-primary)" }}
+          >
+            전체 보기 <ArrowRight size={12} />
           </Link>
         </div>
 
@@ -210,8 +213,8 @@ export default function Home() {
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <CalendarX size={32} className="text-muted-foreground mb-3" />
             <p className="text-sm font-medium text-muted-foreground">연차 신청 내역이 없습니다</p>
-            <Link href="/leave/request">
-              <a className="mt-3 btn-primary text-xs py-1.5 px-3">첫 연차 신청하기</a>
+            <Link href="/leave/request" className="mt-3 btn-primary text-xs py-1.5 px-3">
+              첫 연차 신청하기
             </Link>
           </div>
         ) : (
