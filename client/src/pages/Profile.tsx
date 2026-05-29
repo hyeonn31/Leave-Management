@@ -4,6 +4,25 @@ import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { User, Building2, Briefcase, Calendar, Hash } from "lucide-react";
 
+/**
+ * Convert a Date object or ISO string returned from the DB to YYYY-MM-DD
+ * so it works correctly with <input type="date">.
+ *
+ * mysql2 returns DATE columns as JavaScript Date objects (UTC midnight).
+ * String(date) gives "2020-01-15T00:00:00.000Z" which is NOT valid for
+ * <input type="date"> — the browser ignores it and shows an empty field.
+ * We must use UTC date parts to avoid timezone-shift bugs.
+ */
+function toDateInputValue(val: unknown): string {
+  if (!val) return "";
+  const d = val instanceof Date ? val : new Date(String(val));
+  if (isNaN(d.getTime())) return "";
+  const yyyy = d.getUTCFullYear();
+  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(d.getUTCDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 export default function Profile() {
   const { user } = useAuth();
   const { data: profile, isLoading } = trpc.employee.getMyProfile.useQuery();
@@ -23,7 +42,7 @@ export default function Profile() {
         employeeNumber: profile.employee.employeeNumber ?? "",
         department: profile.employee.department ?? "",
         position: profile.employee.position ?? "",
-        entryDate: profile.employee.entryDate ? String(profile.employee.entryDate) : "",
+        entryDate: toDateInputValue(profile.employee.entryDate),
       });
     }
   }, [profile]);
@@ -185,7 +204,7 @@ export default function Profile() {
                       employeeNumber: profile.employee.employeeNumber ?? "",
                       department: profile.employee.department ?? "",
                       position: profile.employee.position ?? "",
-                      entryDate: profile.employee.entryDate ? String(profile.employee.entryDate) : "",
+                      entryDate: toDateInputValue(profile.employee.entryDate),
                     });
                   }
                 }}

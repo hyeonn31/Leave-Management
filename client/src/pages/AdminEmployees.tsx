@@ -2,6 +2,7 @@ import { trpc } from "@/lib/trpc";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Edit2, Plus, X, ChevronDown } from "lucide-react";
+
 import {
   Dialog,
   DialogContent,
@@ -9,6 +10,17 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+
+/** Convert a Date object or ISO string from DB to YYYY-MM-DD for <input type="date"> */
+function toDateInputValue(val: unknown): string {
+  if (!val) return "";
+  const d = val instanceof Date ? val : new Date(String(val));
+  if (isNaN(d.getTime())) return "";
+  const yyyy = d.getUTCFullYear();
+  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(d.getUTCDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
 
 type EmployeeRow = {
   user: { id: number; name: string | null; email: string | null; role: "user" | "admin" };
@@ -52,7 +64,7 @@ export default function AdminEmployees() {
       employeeNumber: row.employee?.employeeNumber ?? "",
       department: row.employee?.department ?? "",
       position: row.employee?.position ?? "",
-      entryDate: row.employee?.entryDate ? String(row.employee.entryDate) : "",
+      entryDate: toDateInputValue(row.employee?.entryDate),
       status: row.employee?.status ?? "active",
       role: row.user.role,
     });
@@ -132,7 +144,7 @@ export default function AdminEmployees() {
                 {row.employee?.position ?? "-"}
               </div>
               <div className="col-span-2 px-4 py-3 text-sm font-mono text-muted-foreground">
-                {row.employee?.entryDate ? String(row.employee.entryDate) : "-"}
+                {toDateInputValue(row.employee?.entryDate) || "-"}
               </div>
               <div className="col-span-1 px-4 py-3">
                 {row.employee ? (
