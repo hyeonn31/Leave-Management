@@ -114,7 +114,8 @@ const employeeRouter = router({
     )
         .mutation(async ({ input }) => {
       const { userId, role, ...empData } = input;
-      await updateEmployee(userId, empData as any);
+      // Use upsert so it works even if no employee row exists yet
+      await upsertEmployee({ userId, ...empData } as any);
       if (role) await updateUserRole(userId, role);
       // Auto-recalculate leave balance when entryDate is updated
       if (input.entryDate) {
