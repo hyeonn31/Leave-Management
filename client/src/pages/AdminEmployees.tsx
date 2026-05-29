@@ -1,7 +1,7 @@
 import { trpc } from "@/lib/trpc";
 import { useState } from "react";
 import { toast } from "sonner";
-import { Edit2, RefreshCw, Check, Users } from "lucide-react";
+import { Edit2, RefreshCw, Check, Users, Wallet, UserPlus } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
@@ -29,36 +29,42 @@ const STATUS_LABELS: Record<string, string> = { active: "재직", resigned: "퇴
 type RecalcResult = { totalGranted: number; usedDays: number; remaining: number };
 
 export default function AdminEmployees() {
+  const currentYear = new Date().getFullYear();
   const { data: employees, isLoading } = trpc.employee.listAll.useQuery();
   const utils = trpc.useUtils();
 
+  // ─── Employee edit dialog ────────────────────────────────────────────────────
   const [editTarget, setEditTarget] = useState<EmployeeRow | null>(null);
   const [form, setForm] = useState({
     employeeNumber: "", department: "", position: "", entryDate: "",
     status: "active" as "active" | "resigned" | "on_leave",
     role: "user" as "user" | "admin",
   });
-  const [recalcYear, setRecalcYear] = useState<number>(new Date().getFullYear());
+  const [recalcYear, setRecalcYear] = useState<number>(currentYear);
   const [recalcResult, setRecalcResult] = useState<RecalcResult | null>(null);
   const [savedEntryDate, setSavedEntryDate] = useState<string>("");
 
-  const openEdit = (row: EmployeeRow) => {
-    const entryDateStr = toDateInputValue(row.employee?.entryDate);
-    setEditTarget(row);
-    setRecalcResult(null);
-    setSavedEntryDate(entryDateStr);
-    setForm({
-      employeeNumber: row.employee?.employeeNumber ?? "",
-      department: row.employee?.department ?? "",
-      position: row.employee?.position ?? "",
-      entryDate: entryDateStr,
-      status: row.employee?.status ?? "active",
-      role: row.user.role,
-    });
-  };
+  // ─── Leave balance edit dialog ───────────────────────────────────────────────
+  const [balanceTarget, setBalanceTarget] = useState<EmployeeRow | null>(null);
+  const [balanceYear, setBalanceYear] = useState<number>(currentYear);
+  const [balanceForm, setBalanceForm] = useState({ totalGranted: 0, used: 0, reason: "" });
 
-  const closeDialog = () => { setEditTarget(null); setRecalcResult(null); setSavedEntryDate(""); };
+  const { data: balanceData } = trpc.leaveBalance.getAllForYear.useQuery(
+    { fiscalYear: balanceYear },
+    { enabled: !!balanceTarget }
+  );
 
+  // ─── Register dialog ─────────────────────────────────────────────────────────
+  const [showRegisterDialog, setShowRegisterDialog] = useState(false);
+  const [regForm, setRegForm] = useState({
+    userId: 0, employeeNumber: "", department: "", position: "", entryDate: "",
+  });
+  const { data: allUsers } = trpc.employee.listAllUsers.useQuery(undefined, { enabled: showRegisterDialog });
+
+  const registeredUserIds = new Set((employees ?? []).map((e) => e.user.id));
+  const unregisteredUsers = (allUsers ?? []).filter((u) => !registeredUserIds.has(u.id));
+
+  // ─── Mutations ───────────────────────────────────────────────────────────────
   const adminUpdate = trpc.employee.adminUpdate.useMutation({
     onSuccess: () => {
       toast.success("직원 정보가 저장되었습니다.");
@@ -77,6 +83,56 @@ export default function AdminEmployees() {
     onError: (err) => toast.error(`재계산 실패: ${err.message}`),
   });
 
+  const setBalance = trpc.leaveBalance.setBalance.useMutation({
+    onSuccess: (data) => {
+      toast.success(`연차 수정 완료 — 잔여 ${data.remaining}일`);
+      utils.leaveBalance.getAllForYear.invalidate();
+      utils.employee.listAll.invalidate();
+      setBalanceTarget(null);
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const adminCreate = trpc.employee.adminCreate.useMutation({
+    onSuccess: () => {
+      toast.success("직원이 등록되었습니다.");
+      utils.employee.listAll.invalidate();
+      setShowRegisterDialog(false);
+      setRegForm({ userId: 0, employeeNumber: "", department: "", position: "", entryDate: "" });
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  // ─── Handlers ────────────────────────────────────────────────────────────────
+  const openEdit = (row: EmployeeRow) => {
+    const entryDateStr = toDateInputValue(row.employee?.entryDate);
+    setEditTarget(row);
+    setRecalcResult(null);
+    setSavedEntryDate(entryDateStr);
+    setForm({
+      employeeNumber: row.employee?.employeeNumber ?? "",
+      department: row.employee?.department ?? "",
+      position: row.employee?.position ?? "",
+      entryDate: entryDateStr,
+      status: row.employee?.status ?? "active",
+      role: row.user.role,
+    });
+  };
+
+  const openBalanceEdit = (row: EmployeeRow) => {
+    setBalanceTarget(row);
+    setBalanceYear(currentYear);
+    setBalanceForm({ totalGranted: 0, used: 0, reason: "" });
+  };
+
+  // When balance data loads, pre-fill the form
+  const currentBalance = balanceData?.find((b) => b.user.id === balanceTarget?.user.id);
+  const prefilledBalance = currentBalance
+    ? { totalGranted: Number(currentBalance.balance.totalGranted), used: Number(currentBalance.balance.used) }
+    : null;
+
+  const closeDialog = () => { setEditTarget(null); setRecalcResult(null); setSavedEntryDate(""); };
+
   const handleSave = () => {
     if (!editTarget) return;
     adminUpdate.mutate({
@@ -90,11 +146,35 @@ export default function AdminEmployees() {
     });
   };
 
+  const handleBalanceSave = () => {
+    if (!balanceTarget) return;
+    if (!balanceForm.reason.trim()) return toast.error("수정 사유를 입력해주세요.");
+    setBalance.mutate({
+      userId: balanceTarget.user.id,
+      fiscalYear: balanceYear,
+      totalGranted: balanceForm.totalGranted,
+      used: balanceForm.used,
+      reason: balanceForm.reason,
+    });
+  };
+
   const canRecalc = !!savedEntryDate;
   const entryDateChanged = form.entryDate !== savedEntryDate;
 
   return (
     <DashboardLayout>
+      {/* Header with register button */}
+      <div className="flex items-center justify-between mb-4">
+        <div />
+        <button
+          onClick={() => setShowRegisterDialog(true)}
+          className="btn-primary text-sm"
+        >
+          <UserPlus size={15} />
+          직원 등록
+        </button>
+      </div>
+
       <div className="bg-card rounded-2xl shadow-card overflow-hidden">
         <div className="px-5 py-4 border-b border-border flex items-center gap-2">
           <Users size={16} style={{ color: "var(--color-primary)" }} />
@@ -121,7 +201,7 @@ export default function AdminEmployees() {
                   <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">직급</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">입사일</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">상태</th>
-                  <th className="px-5 py-3" />
+                  <th className="px-5 py-3 text-right text-xs font-medium text-muted-foreground">관리</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -152,13 +232,22 @@ export default function AdminEmployees() {
                       )}
                     </td>
                     <td className="px-5 py-3 text-right">
-                      <button
-                        onClick={() => openEdit(row as EmployeeRow)}
-                        className="p-1.5 rounded-lg hover:bg-muted transition-colors"
-                        title="수정"
-                      >
-                        <Edit2 size={14} className="text-muted-foreground" />
-                      </button>
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => openBalanceEdit(row as EmployeeRow)}
+                          className="p-1.5 rounded-lg hover:bg-muted transition-colors"
+                          title="연차 수정"
+                        >
+                          <Wallet size={14} className="text-muted-foreground" />
+                        </button>
+                        <button
+                          onClick={() => openEdit(row as EmployeeRow)}
+                          className="p-1.5 rounded-lg hover:bg-muted transition-colors"
+                          title="정보 수정"
+                        >
+                          <Edit2 size={14} className="text-muted-foreground" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -168,7 +257,7 @@ export default function AdminEmployees() {
         )}
       </div>
 
-      {/* Edit dialog */}
+      {/* ─── Employee Info Edit Dialog ─────────────────────────────────────── */}
       <Dialog open={!!editTarget} onOpenChange={(open) => { if (!open) closeDialog(); }}>
         <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto rounded-2xl">
           <DialogHeader>
@@ -289,6 +378,251 @@ export default function AdminEmployees() {
             </button>
             <button onClick={handleSave} disabled={adminUpdate.isPending} className="btn-primary disabled:opacity-50">
               {adminUpdate.isPending ? "저장 중…" : "저장"}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Leave Balance Direct Edit Dialog ─────────────────────────────── */}
+      <Dialog open={!!balanceTarget} onOpenChange={(open) => { if (!open) setBalanceTarget(null); }}>
+        <DialogContent className="max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="font-semibold text-foreground flex items-center gap-2">
+              <Wallet size={16} style={{ color: "var(--color-primary)" }} />
+              연차 직접 수정 — {balanceTarget?.user.name}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            {/* Year selector */}
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1.5">대상 연도</label>
+              <div className="flex items-center gap-2">
+                {[currentYear - 1, currentYear, currentYear + 1].map((y) => (
+                  <button
+                    key={y}
+                    type="button"
+                    onClick={() => setBalanceYear(y)}
+                    className={`pill-tab ${balanceYear === y ? "active" : ""}`}
+                  >
+                    {y}년
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Current balance info */}
+            {prefilledBalance && (
+              <div className="p-3 bg-muted/40 rounded-xl">
+                <p className="text-xs text-muted-foreground mb-2">현재 {balanceYear}년 연차 현황</p>
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  {[
+                    { label: "총 부여", value: prefilledBalance.totalGranted },
+                    { label: "사용", value: prefilledBalance.used },
+                    { label: "잔여", value: prefilledBalance.totalGranted - prefilledBalance.used },
+                  ].map(({ label, value }) => (
+                    <div key={label}>
+                      <p className="text-lg font-bold text-foreground">{value}</p>
+                      <p className="text-xs text-muted-foreground">{label}일</p>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setBalanceForm((f) => ({ ...f, totalGranted: prefilledBalance.totalGranted, used: prefilledBalance.used }))}
+                  className="mt-2 text-xs text-primary hover:underline"
+                >
+                  현재 값으로 채우기
+                </button>
+              </div>
+            )}
+            {!prefilledBalance && balanceData && (
+              <div className="p-3 bg-amber-50 rounded-xl border border-amber-200">
+                <p className="text-xs text-amber-700">{balanceYear}년 연차 데이터가 없습니다. 새로 생성됩니다.</p>
+              </div>
+            )}
+
+            {/* New values */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+                  총 부여일수 <span className="text-destructive">*</span>
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  max={365}
+                  step={0.5}
+                  value={balanceForm.totalGranted}
+                  onChange={(e) => setBalanceForm((f) => ({ ...f, totalGranted: Number(e.target.value) }))}
+                  className="w-full h-10 rounded-xl border border-border px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors font-mono"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+                  사용일수 <span className="text-destructive">*</span>
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  max={365}
+                  step={0.5}
+                  value={balanceForm.used}
+                  onChange={(e) => setBalanceForm((f) => ({ ...f, used: Number(e.target.value) }))}
+                  className="w-full h-10 rounded-xl border border-border px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors font-mono"
+                />
+              </div>
+            </div>
+
+            {/* Calculated remaining */}
+            <div
+              className="flex items-center justify-between px-4 py-3 rounded-xl"
+              style={{ background: "oklch(93% 0.06 264)" }}
+            >
+              <span className="text-sm text-muted-foreground">수정 후 잔여일수</span>
+              <span
+                className="text-xl font-bold"
+                style={{
+                  color: Math.max(0, balanceForm.totalGranted - balanceForm.used) === 0
+                    ? "oklch(55% 0.22 25)"
+                    : "var(--color-primary)",
+                }}
+              >
+                {Math.max(0, balanceForm.totalGranted - balanceForm.used)}일
+              </span>
+            </div>
+
+            {/* Reason */}
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+                수정 사유 <span className="text-destructive">*</span>
+              </label>
+              <input
+                type="text"
+                value={balanceForm.reason}
+                onChange={(e) => setBalanceForm((f) => ({ ...f, reason: e.target.value }))}
+                placeholder="예: 입사일 오류 정정, 특별 부여 등"
+                className="w-full h-10 rounded-xl border border-border px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 pt-2">
+            <button
+              onClick={() => setBalanceTarget(null)}
+              className="px-4 py-2 rounded-xl border border-border text-sm font-medium hover:bg-muted transition-colors"
+            >
+              취소
+            </button>
+            <button
+              onClick={handleBalanceSave}
+              disabled={setBalance.isPending || !balanceForm.reason.trim()}
+              className="btn-primary disabled:opacity-50"
+            >
+              {setBalance.isPending ? "저장 중…" : "저장"}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Register Dialog ──────────────────────────────────────────────── */}
+      <Dialog open={showRegisterDialog} onOpenChange={(open) => { if (!open) setShowRegisterDialog(false); }}>
+        <DialogContent className="max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="font-semibold text-foreground flex items-center gap-2">
+              <UserPlus size={16} style={{ color: "var(--color-primary)" }} />
+              신규 직원 등록
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+                사용자 선택 <span className="text-destructive">*</span>
+              </label>
+              <select
+                value={regForm.userId}
+                onChange={(e) => setRegForm((f) => ({ ...f, userId: Number(e.target.value) }))}
+                className="w-full h-10 rounded-xl border border-border px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors bg-background"
+              >
+                <option value={0}>-- 사용자를 선택하세요 --</option>
+                {unregisteredUsers.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name ?? u.email} ({u.email})
+                  </option>
+                ))}
+              </select>
+              {unregisteredUsers.length === 0 && allUsers && (
+                <p className="mt-1.5 text-xs text-muted-foreground">미등록 사용자가 없습니다.</p>
+              )}
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1.5">사번</label>
+              <input
+                type="text"
+                value={regForm.employeeNumber}
+                onChange={(e) => setRegForm((f) => ({ ...f, employeeNumber: e.target.value }))}
+                placeholder="EMP-001"
+                className="w-full h-10 rounded-xl border border-border px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1.5">부서</label>
+                <input
+                  type="text"
+                  value={regForm.department}
+                  onChange={(e) => setRegForm((f) => ({ ...f, department: e.target.value }))}
+                  placeholder="개발팀"
+                  className="w-full h-10 rounded-xl border border-border px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1.5">직급</label>
+                <input
+                  type="text"
+                  value={regForm.position}
+                  onChange={(e) => setRegForm((f) => ({ ...f, position: e.target.value }))}
+                  placeholder="선임 개발자"
+                  className="w-full h-10 rounded-xl border border-border px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+                입사일 <span className="text-muted-foreground font-normal">(연차 자동 계산에 사용)</span>
+              </label>
+              <input
+                type="date"
+                value={regForm.entryDate}
+                onChange={(e) => setRegForm((f) => ({ ...f, entryDate: e.target.value }))}
+                className="w-full h-10 rounded-xl border border-border px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 pt-2">
+            <button
+              onClick={() => setShowRegisterDialog(false)}
+              className="px-4 py-2 rounded-xl border border-border text-sm font-medium hover:bg-muted transition-colors"
+            >
+              취소
+            </button>
+            <button
+              onClick={() => {
+                if (!regForm.userId) return toast.error("사용자를 선택해주세요.");
+                adminCreate.mutate({
+                  userId: regForm.userId,
+                  employeeNumber: regForm.employeeNumber || undefined,
+                  department: regForm.department || undefined,
+                  position: regForm.position || undefined,
+                  entryDate: regForm.entryDate || undefined,
+                });
+              }}
+              disabled={adminCreate.isPending || !regForm.userId}
+              className="btn-primary disabled:opacity-50"
+            >
+              {adminCreate.isPending ? "등록 중…" : "등록하기"}
             </button>
           </DialogFooter>
         </DialogContent>

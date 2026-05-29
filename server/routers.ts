@@ -80,6 +80,10 @@ const employeeRouter = router({
   listAll: adminProcedure.query(async () => {
     return getAllEmployeesWithUsers();
   }),
+  // Admin: list all users (for employee registration dialog)
+  listAllUsers: adminProcedure.query(async () => {
+    return getAllUsers();
+  }),
 
   // Admin: update employee
   adminUpdate: adminProcedure
@@ -255,11 +259,48 @@ const leaveBalanceRouter = router({
           relatedId: null,
         });
       }
-
       return { success: true };
     }),
+  // Admin: directly set balance values (override)
+  setBalance: adminProcedure
+    .input(
+      z.object({
+        userId: z.number(),
+        fiscalYear: z.number(),
+        totalGranted: z.number().min(0),
+        used: z.number().min(0),
+        reason: z.string().min(1),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const remaining = Math.max(0, input.totalGranted - input.used);
+      await upsertLeaveBalance({
+        userId: input.userId,
+        fiscalYear: input.fiscalYear,
+        totalGranted: String(input.totalGranted),
+        used: String(input.used),
+        remaining: String(remaining),
+      });
+      await createLeaveAdjustment({
+        userId: input.userId,
+        fiscalYear: input.fiscalYear,
+        adjustmentDays: String(input.totalGranted),
+        reason: `[직접 설정] ${input.reason} (부여:${input.totalGranted}일, 사용:${input.used}일, 잔여:${remaining}일)`,
+        adjustedBy: ctx.user.id,
+      });
+      const targetUser = await getUserById(input.userId);
+      if (targetUser) {
+        await createNotification({
+          userId: input.userId,
+          type: "leave_renewal",
+          title: "연차 직접 수정",
+          message: `${input.fiscalYear}년 연차가 관리자에 의해 수정되었습니다. 총 부여: ${input.totalGranted}일, 사용: ${input.used}일, 잔여: ${remaining}일. 사유: ${input.reason}`,
+          relatedId: null,
+        });
+      }
+      return { success: true, remaining };
+    }),
 });
-
 // ─── Leave Request router ──────────────────────────────────────────────────────
 const leaveRequestRouter = router({
   submit: protectedProcedure

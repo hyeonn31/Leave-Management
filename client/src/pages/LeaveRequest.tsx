@@ -5,7 +5,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
-import { CalendarIcon, ChevronRight, Info } from "lucide-react";
+import { AlertTriangle, CalendarIcon, CheckCircle2, ChevronRight, Info } from "lucide-react";
 import type { DateRange } from "react-day-picker";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -21,6 +21,9 @@ const LEAVE_TYPES = [
 ] as const;
 
 type LeaveTypeValue = (typeof LEAVE_TYPES)[number]["value"];
+
+// Types that deduct from balance
+const DEDUCTIBLE_TYPES: LeaveTypeValue[] = ["annual", "half_am", "half_pm", "sick", "special"];
 
 export default function LeaveRequest() {
   const { user } = useAuth();
@@ -51,7 +54,10 @@ export default function LeaveRequest() {
   });
 
   const isHalfDay = leaveType === "half_am" || leaveType === "half_pm";
+  const isDeductible = DEDUCTIBLE_TYPES.includes(leaveType);
   const remaining = Number(balance?.remaining ?? 0);
+  const totalGranted = Number(balance?.totalGranted ?? 0);
+  const used = Number(balance?.used ?? 0);
 
   const calcDays = () => {
     if (!dateRange?.from) return 0;
@@ -68,11 +74,14 @@ export default function LeaveRequest() {
   };
 
   const days = calcDays();
-  const afterRemaining = remaining - days;
+  const afterRemaining = isDeductible ? remaining - days : remaining;
+  const isOverBalance = isDeductible && days > 0 && afterRemaining < 0;
+  const isExact = isDeductible && days > 0 && afterRemaining === 0;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!dateRange?.from) return toast.error("날짜를 선택해주세요.");
+    if (isOverBalance) return toast.error("잔여 연차가 부족합니다.");
     const startDate = format(dateRange.from, "yyyy-MM-dd");
     const endDate = isHalfDay
       ? startDate
@@ -86,9 +95,9 @@ export default function LeaveRequest() {
         {/* Balance summary */}
         <div className="grid grid-cols-3 gap-3 mb-6">
           {[
-            { label: "총 부여", value: balance?.totalGranted ?? 0, color: "var(--color-primary)" },
-            { label: "사용",    value: balance?.used ?? 0,         color: "oklch(75% 0.18 85)" },
-            { label: "잔여",    value: balance?.remaining ?? 0,    color: "oklch(60% 0.18 145)" },
+            { label: "총 부여", value: totalGranted, color: "var(--color-primary)" },
+            { label: "사용",    value: used,          color: "oklch(55% 0.18 85)" },
+            { label: "잔여",    value: remaining,     color: "oklch(45% 0.18 145)" },
           ].map((s) => (
             <div key={s.label} className="bg-card rounded-2xl p-4 shadow-card text-center">
               <p className="text-xs text-muted-foreground mb-1">{s.label}</p>
@@ -180,19 +189,117 @@ export default function LeaveRequest() {
               </Popover>
             </div>
 
-            {/* Days preview */}
-            {days > 0 && (
+            {/* ─── Real-time preview panel ─────────────────────────────────── */}
+            {days > 0 && isDeductible && (
               <div
-                className="flex items-center justify-between px-4 py-3 rounded-xl"
-                style={{ background: "oklch(93% 0.06 264)" }}
+                className={`rounded-xl border-2 overflow-hidden transition-all duration-200 ${
+                  isOverBalance
+                    ? "border-destructive/50"
+                    : isExact
+                    ? "border-amber-400/60"
+                    : "border-primary/30"
+                }`}
               >
-                <div className="flex items-center gap-2 text-sm" style={{ color: "var(--color-primary)" }}>
-                  <Info size={14} />
-                  <span>차감 예정: <strong>{days}일</strong></span>
+                {/* Header row */}
+                <div
+                  className={`flex items-center justify-between px-4 py-2.5 ${
+                    isOverBalance
+                      ? "bg-destructive/8"
+                      : isExact
+                      ? "bg-amber-50"
+                      : "bg-primary/5"
+                  }`}
+                >
+                  <div className="flex items-center gap-2 text-sm font-medium">
+                    {isOverBalance ? (
+                      <AlertTriangle size={15} className="text-destructive" />
+                    ) : isExact ? (
+                      <AlertTriangle size={15} className="text-amber-600" />
+                    ) : (
+                      <Info size={15} style={{ color: "var(--color-primary)" }} />
+                    )}
+                    <span
+                      style={{
+                        color: isOverBalance
+                          ? "var(--color-destructive)"
+                          : isExact
+                          ? "oklch(55% 0.18 85)"
+                          : "var(--color-primary)",
+                      }}
+                    >
+                      {isOverBalance
+                        ? "잔여 연차 부족 — 신청 불가"
+                        : isExact
+                        ? "연차를 모두 소진합니다"
+                        : "연차 차감 미리보기"}
+                    </span>
+                  </div>
                 </div>
-                <span className={`text-sm font-semibold ${afterRemaining < 0 ? "text-destructive" : "text-foreground"}`}>
-                  신청 후 잔여: {afterRemaining}일
-                </span>
+
+                {/* Detail row */}
+                <div className="grid grid-cols-3 divide-x divide-border bg-card px-0 py-0">
+                  {[
+                    { label: "차감 예정", value: `${days}일`, highlight: false },
+                    {
+                      label: "현재 잔여",
+                      value: `${remaining}일`,
+                      highlight: false,
+                    },
+                    {
+                      label: "신청 후 잔여",
+                      value: `${afterRemaining}일`,
+                      highlight: true,
+                      danger: isOverBalance,
+                      warn: isExact,
+                    },
+                  ].map((item) => (
+                    <div key={item.label} className="flex flex-col items-center py-3 px-2">
+                      <p className="text-xs text-muted-foreground mb-1">{item.label}</p>
+                      <p
+                        className="text-xl font-bold"
+                        style={{
+                          color: item.danger
+                            ? "var(--color-destructive)"
+                            : item.warn
+                            ? "oklch(55% 0.18 85)"
+                            : item.highlight
+                            ? "oklch(45% 0.18 145)"
+                            : "var(--color-foreground)",
+                        }}
+                      >
+                        {item.value}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Warning message */}
+                {isOverBalance && (
+                  <div className="px-4 py-2.5 bg-destructive/5 border-t border-destructive/20 flex items-center gap-2">
+                    <AlertTriangle size={13} className="text-destructive shrink-0" />
+                    <p className="text-xs text-destructive">
+                      잔여 연차({remaining}일)보다 신청일수({days}일)가 많습니다. 날짜를 줄이거나 무급 휴가로 변경해주세요.
+                    </p>
+                  </div>
+                )}
+                {isExact && !isOverBalance && (
+                  <div className="px-4 py-2.5 bg-amber-50 border-t border-amber-200 flex items-center gap-2">
+                    <CheckCircle2 size={13} className="text-amber-600 shrink-0" />
+                    <p className="text-xs text-amber-700">
+                      신청 후 잔여 연차가 0일이 됩니다. 신청 전 확인해주세요.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Unpaid leave notice */}
+            {leaveType === "unpaid" && days > 0 && (
+              <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-muted/50 border border-border">
+                <Info size={14} className="text-muted-foreground shrink-0" />
+                <p className="text-xs text-muted-foreground">
+                  무급 휴가는 연차 잔여일수에서 차감되지 않습니다. ({days}일 신청)
+                </p>
               </div>
             )}
 
@@ -222,7 +329,7 @@ export default function LeaveRequest() {
             </button>
             <button
               type="submit"
-              disabled={submit.isPending || !dateRange?.from || (afterRemaining < 0 && days > 0)}
+              disabled={submit.isPending || !dateRange?.from || isOverBalance}
               className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {submit.isPending ? "신청 중…" : "신청하기"}
