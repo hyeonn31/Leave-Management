@@ -122,8 +122,15 @@ export async function upsertEmployee(data: InsertEmployee): Promise<void> {
       position: data.position,
       entryDate: data.entryDate,
       status: data.status,
+      teamId: data.teamId,
     },
   });
+}
+export async function assignEmployeeToTeam(userId: number, teamId: number | null): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  // If employee row exists, update it; otherwise do nothing (employee must be registered first)
+  await db.update(employees).set({ teamId }).where(eq(employees.userId, userId));
 }
 
 export async function getAllEmployeesWithUsers() {

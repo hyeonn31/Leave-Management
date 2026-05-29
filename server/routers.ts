@@ -46,6 +46,7 @@ import {
   getTeamByApproverId,
   getPendingRequestsForTeam,
   getAllRequestsForTeam,
+  assignEmployeeToTeam,
 } from "./db";
 import { calculateLeaveEntitlement, calculateDaysForLeaveType, calculateGrantedDaysForYear } from "./leaveCalc";
 import { notifyOwner } from "./_core/notification";
@@ -816,8 +817,7 @@ const teamRouter = router({
   assignEmployee: adminProcedure
     .input(z.object({ userId: z.number(), teamId: z.number().nullable() }))
     .mutation(async ({ input }) => {
-      const db = await import("./db");
-      await db.updateEmployee(input.userId, { teamId: input.teamId } as any);
+      await assignEmployeeToTeam(input.userId, input.teamId);
       return { success: true };
     }),
   getMyTeams: protectedProcedure.query(async ({ ctx }) => getTeamByApproverId(ctx.user.id)),
